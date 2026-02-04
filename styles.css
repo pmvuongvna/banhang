@@ -497,7 +497,7 @@ body {
 }
 
 .tab-content.active {
-    display: block;
+    display: block !important;
 }
 
 @keyframes fadeIn {
@@ -720,8 +720,8 @@ body {
 /* ==========================================
    Sales Page
    ========================================== */
-#tab-sales {
-    display: flex;
+#tab-sales.active {
+    display: flex !important;
     flex-direction: column;
     gap: 24px;
 }
