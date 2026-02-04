@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QLBH - Quản Lý Bán Hàng</title>
+    <meta name="description" content="Ứng dụng quản lý bán hàng gọn nhẹ với Google Sheets">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="logo">
+                    <span class="logo-icon">📊</span>
+                    <h1>QLBH</h1>
+                    <p>Quản Lý Bán Hàng</p>
+                </div>
+                <p class="tagline">Kết nối với Google Sheets để bắt đầu</p>
+                <button id="btn-login" class="btn btn-google">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#4285F4"
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853"
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05"
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                        <path fill="#EA4335"
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                    </svg>
+                    <span>Đăng nhập với Google</span>
+                </button>
+                <p class="note">Dữ liệu được lưu trữ an toàn trên Google Sheets của bạn</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Setup Screen (First time) -->
+    <div id="setup-screen" class="screen">
+        <div class="setup-container">
+            <div class="setup-card">
+                <h2>🏪 Thiết lập cửa hàng</h2>
+                <p>Chào mừng! Hãy nhập thông tin cửa hàng của bạn.</p>
+                <form id="setup-form">
+                    <div class="form-group">
+                        <label for="store-name">Tên cửa hàng</label>
+                        <input type="text" id="store-name" placeholder="VD: Cửa hàng ABC" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span>Tạo bảng dữ liệu</span>
+                        <span class="icon">→</span>
+                    </button>
+                </form>
+                <p class="note">App sẽ tự động tạo Google Sheets với cấu trúc phù hợp</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app-screen" class="screen">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <span class="logo-small">📊 QLBH</span>
+                <span id="store-name-display" class="store-name"></span>
+            </div>
+            <div class="header-right">
+                <button id="btn-theme" class="btn-icon" title="Đổi theme">🌙</button>
+                <button id="btn-sync" class="btn-icon" title="Đồng bộ">🔄</button>
+                <div class="user-menu">
+                    <img id="user-avatar" src="" alt="Avatar" class="avatar">
+                    <button id="btn-logout" class="btn-icon" title="Đăng xuất">🚪</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="app-nav">
+            <button class="nav-btn active" data-tab="dashboard">
+                <span class="nav-icon">📈</span>
+                <span class="nav-text">Tổng quan</span>
+            </button>
+            <button class="nav-btn" data-tab="products">
+                <span class="nav-icon">📦</span>
+                <span class="nav-text">Sản phẩm</span>
+            </button>
+            <button class="nav-btn" data-tab="sales">
+                <span class="nav-icon">🛒</span>
+                <span class="nav-text">Bán hàng</span>
+            </button>
+            <button class="nav-btn" data-tab="transactions">
+                <span class="nav-icon">💰</span>
+                <span class="nav-text">Thu chi</span>
+            </button>
+            <button class="nav-btn" data-tab="reports">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">Báo cáo</span>
+            </button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Dashboard Tab -->
+            <section id="tab-dashboard" class="tab-content active">
+                <div class="dashboard-grid">
+                    <div class="stat-card revenue">
+                        <div class="stat-icon">💵</div>
+                        <div class="stat-info">
+                            <span class="stat-label">Doanh thu hôm nay</span>
+                            <span id="stat-revenue" class="stat-value">0đ</span>
+                        </div>
+                    </div>
+                    <div class="stat-card profit">
+                        <div class="stat-icon">📈</div>
+                        <div class="stat-info">
+                            <span class="stat-label">Lợi nhuận hôm nay</span>
+                            <span id="stat-profit" class="stat-value">0đ</span>
+                        </div>
+                    </div>
+                    <div class="stat-card orders">
+                        <div class="stat-icon">🛍️</div>
+                        <div class="stat-info">
+                            <span class="stat-label">Số đơn hôm nay</span>
+                            <span id="stat-orders" class="stat-value">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card products">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-info">
+                            <span class="stat-label">Tổng sản phẩm</span>
+                            <span id="stat-products" class="stat-value">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-sections">
+                    <div class="section recent-sales">
+                        <h3>🛒 Đơn hàng gần đây</h3>
+                        <div id="recent-sales-list" class="list-container">
+                            <p class="empty-state">Chưa có đơn hàng nào</p>
+                        </div>
+                    </div>
+                    <div class="section low-stock">
+                        <h3>⚠️ Sắp hết hàng</h3>
+                        <div id="low-stock-list" class="list-container">
+                            <p class="empty-state">Tất cả sản phẩm còn đủ hàng</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Products Tab -->
+            <section id="tab-products" class="tab-content">
+                <div class="tab-header">
+                    <h2>📦 Quản lý sản phẩm</h2>
+                    <button id="btn-add-product" class="btn btn-primary">
+                        <span>+ Thêm sản phẩm</span>
+                    </button>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="search-products" placeholder="🔍 Tìm kiếm theo tên hoặc mã...">
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="products-table">
+                        <thead>
+                            <tr>
+                                <th>Mã SP</th>
+                                <th>Tên sản phẩm</th>
+                                <th>Giá nhập</th>
+                                <th>Giá bán</th>
+                                <th>Lãi</th>
+                                <th>Tồn kho</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-tbody">
+                            <!-- Products will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Sales Tab -->
+            <section id="tab-sales" class="tab-content">
+                <div class="sales-container">
+                    <div class="sales-left">
+                        <div class="tab-header">
+                            <h2>🛒 Bán hàng</h2>
+                        </div>
+                        <div class="search-bar">
+                            <input type="text" id="search-sale-product" placeholder="🔍 Nhập mã hoặc tên sản phẩm...">
+                        </div>
+                        <div id="product-search-results" class="search-results">
+                            <!-- Search results appear here -->
+                        </div>
+                    </div>
+                    <div class="sales-right">
+                        <div class="cart-header">
+                            <h3>🧺 Giỏ hàng</h3>
+                            <button id="btn-clear-cart" class="btn btn-text">Xóa tất cả</button>
+                        </div>
+                        <div id="cart-items" class="cart-items">
+                            <p class="empty-state">Chưa có sản phẩm trong giỏ</p>
+                        </div>
+                        <div class="cart-summary">
+                            <div class="form-group cart-note">
+                                <input type="text" id="cart-note" placeholder="📝 Ghi chú đơn hàng (tùy chọn)...">
+                            </div>
+                            <div class="summary-row">
+                                <span>Tổng tiền:</span>
+                                <span id="cart-total" class="total-value">0đ</span>
+                            </div>
+                            <div class="summary-row profit">
+                                <span>Lợi nhuận:</span>
+                                <span id="cart-profit" class="profit-value">0đ</span>
+                            </div>
+                            <button id="btn-checkout" class="btn btn-success btn-large">
+                                💰 Thanh toán
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Transactions Tab -->
+            <section id="tab-transactions" class="tab-content">
+                <div class="tab-header">
+                    <h2>💰 Quản lý thu chi</h2>
+                    <div class="btn-group">
+                        <button id="btn-add-income" class="btn btn-success">+ Thu</button>
+                        <button id="btn-add-expense" class="btn btn-danger">+ Chi</button>
+                    </div>
+                </div>
+                <div class="transactions-summary">
+                    <div class="summary-card income">
+                        <span class="label">Tổng thu</span>
+                        <span id="total-income" class="value">0đ</span>
+                    </div>
+                    <div class="summary-card expense">
+                        <span class="label">Tổng chi</span>
+                        <span id="total-expense" class="value">0đ</span>
+                    </div>
+                    <div class="summary-card balance">
+                        <span class="label">Còn lại</span>
+                        <span id="total-balance" class="value">0đ</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="transactions-table">
+                        <thead>
+                            <tr>
+                                <th>Ngày</th>
+                                <th>Loại</th>
+                                <th>Mô tả</th>
+                                <th>Số tiền</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactions-tbody">
+                            <!-- Transactions will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Reports Tab -->
+            <section id="tab-reports" class="tab-content">
+                <div class="tab-header">
+                    <h2>📊 Báo cáo thống kê</h2>
+                    <div class="date-filter">
+                        <select id="report-period">
+                            <option value="today">Hôm nay</option>
+                            <option value="week">Tuần này</option>
+                            <option value="month" selected>Tháng này</option>
+                            <option value="all">Tất cả</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="reports-grid">
+                    <div class="report-card">
+                        <h4>💵 Doanh thu</h4>
+                        <span id="report-revenue" class="report-value">0đ</span>
+                    </div>
+                    <div class="report-card">
+                        <h4>📈 Lợi nhuận</h4>
+                        <span id="report-profit" class="report-value">0đ</span>
+                    </div>
+                    <div class="report-card">
+                        <h4>🛍️ Số đơn hàng</h4>
+                        <span id="report-orders" class="report-value">0</span>
+                    </div>
+                    <div class="report-card">
+                        <h4>📦 SP đã bán</h4>
+                        <span id="report-items" class="report-value">0</span>
+                    </div>
+                </div>
+                <div class="section top-products">
+                    <h3>🏆 Sản phẩm bán chạy</h3>
+                    <div id="top-products-list" class="list-container">
+                        <p class="empty-state">Chưa có dữ liệu</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal for Product -->
+    <div id="modal-product" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-product-title">Thêm sản phẩm</h3>
+                <button class="btn-close" data-close="modal-product">&times;</button>
+            </div>
+            <form id="form-product">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="product-code">Mã sản phẩm</label>
+                        <input type="text" id="product-code" placeholder="VD: SP001" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-name">Tên sản phẩm</label>
+                        <input type="text" id="product-name" placeholder="Nhập tên sản phẩm" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="product-cost">Giá nhập</label>
+                        <input type="number" id="product-cost" placeholder="0" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-price">Giá bán</label>
+                        <input type="number" id="product-price" placeholder="0" min="0" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="product-stock">Tồn kho</label>
+                        <input type="number" id="product-stock" placeholder="0" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Lãi (tự động tính)</label>
+                        <input type="text" id="product-profit-display" readonly disabled>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modal-product">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Lưu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Transaction -->
+    <div id="modal-transaction" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-transaction-title">Thêm giao dịch</h3>
+                <button class="btn-close" data-close="modal-transaction">&times;</button>
+            </div>
+            <form id="form-transaction">
+                <input type="hidden" id="transaction-type" value="income">
+                <div class="form-group">
+                    <label for="transaction-desc">Mô tả</label>
+                    <input type="text" id="transaction-desc" placeholder="VD: Tiền nhập hàng" required>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-amount">Số tiền</label>
+                    <input type="number" id="transaction-amount" placeholder="0" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-note">Ghi chú (tùy chọn)</label>
+                    <input type="text" id="transaction-note" placeholder="Ghi chú thêm...">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modal-transaction">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Lưu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="loading-overlay">
+        <div class="spinner"></div>
+        <span>Đang xử lý...</span>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="config.js"></script>
+    <script src="sheets-api.js"></script>
+    <script src="products.js"></script>
+    <script src="sales.js"></script>
+    <script src="transactions.js"></script>
+    <script src="reports.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
