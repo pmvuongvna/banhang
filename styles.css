@@ -720,11 +720,57 @@ body {
 /* ==========================================
    Sales Page
    ========================================== */
+#tab-sales {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
 .sales-container {
     display: grid;
     grid-template-columns: 1fr 400px;
     gap: 24px;
-    height: calc(100vh - var(--header-height) - var(--nav-height) - 48px);
+    min-height: 400px;
+}
+
+.sales-history {
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.sales-history .tab-header {
+    margin-bottom: 16px;
+}
+
+.sales-history .tab-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+    padding: 8px 16px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-outline:hover {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.details-cell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .sales-left {
@@ -1027,6 +1073,101 @@ body {
 .transaction-type.expense {
     background: var(--accent-danger-light);
     color: var(--accent-danger);
+}
+
+.note-cell {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* ==========================================
+   Filter Buttons
+   ========================================== */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-tertiary);
+    padding: 4px;
+    border-radius: var(--border-radius-sm);
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: var(--border-radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.filter-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+.filter-btn.active {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.filter-btn.income.active {
+    background: var(--accent-success);
+}
+
+.filter-btn.expense.active {
+    background: var(--accent-danger);
+}
+
+/* ==========================================
+   Chart Section
+   ========================================== */
+.chart-section {
+    min-height: 300px;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.chart-header h3 {
+    margin: 0;
+}
+
+.chart-header select {
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.chart-container {
+    position: relative;
+    height: 250px;
+}
+
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* ==========================================

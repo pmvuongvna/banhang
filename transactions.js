@@ -6,6 +6,7 @@
 const Transactions = {
     transactions: [],
     editingTransactionRow: null,
+    currentFilter: 'all',
 
     /**
      * Load all transactions
@@ -32,22 +33,45 @@ const Transactions = {
     },
 
     /**
+     * Filter transactions by type
+     */
+    filterTransactions(filter) {
+        this.currentFilter = filter;
+
+        // Update filter button states
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === filter);
+        });
+
+        this.renderTransactions();
+    },
+
+    /**
      * Render transactions table
      */
     renderTransactions() {
         const tbody = document.getElementById('transactions-tbody');
 
-        if (this.transactions.length === 0) {
+        // Filter based on current filter
+        let filtered = this.transactions;
+        if (this.currentFilter !== 'all') {
+            filtered = this.transactions.filter(t => t.type === this.currentFilter);
+        }
+
+        if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="5" class="empty-state">Chưa có giao dịch nào</td>
+                    <td colspan="6" class="empty-state">
+                        ${this.currentFilter === 'all' ? 'Chưa có giao dịch nào' :
+                    this.currentFilter === 'income' ? 'Chưa có khoản thu nào' : 'Chưa có khoản chi nào'}
+                    </td>
                 </tr>
             `;
             return;
         }
 
         // Sort by date descending (newest first)
-        const sorted = [...this.transactions].reverse();
+        const sorted = [...filtered].reverse();
 
         tbody.innerHTML = sorted.map(t => `
             <tr>
@@ -61,8 +85,10 @@ const Transactions = {
                 <td style="color: var(--accent-${t.type === 'income' ? 'success' : 'danger'}); font-weight: 600;">
                     ${t.type === 'income' ? '+' : '-'}${Products.formatCurrency(t.amount)}
                 </td>
+                <td class="note-cell">${Products.escapeHtml(t.note)}</td>
                 <td>
                     <div class="action-btns">
+                        <button class="action-btn edit" onclick="Transactions.editTransaction('${t.id}')" title="Sửa">✏️</button>
                         <button class="action-btn delete" onclick="Transactions.deleteTransaction('${t.id}')" title="Xóa">🗑️</button>
                     </div>
                 </td>
@@ -93,6 +119,7 @@ const Transactions = {
      * Show add transaction modal
      */
     showAddModal(type) {
+        this.editingTransactionRow = null;
         document.getElementById('modal-transaction-title').textContent =
             type === 'income' ? '➕ Thêm khoản thu' : '➖ Thêm khoản chi';
         document.getElementById('transaction-type').value = type;
@@ -101,31 +128,42 @@ const Transactions = {
     },
 
     /**
-     * Add transaction (can be called programmatically)
+     * Edit transaction
      */
-    async addTransaction(type, description, amount, note = '') {
-        try {
-            const id = 'GD' + Date.now().toString().slice(-8);
-            const date = new Date().toLocaleDateString('vi-VN');
+    editTransaction(id) {
+        const transaction = this.transactions.find(t => t.id === id);
+        if (!transaction) return;
 
-            await SheetsAPI.appendData(CONFIG.SHEETS.TRANSACTIONS, [
-                id,
-                date,
-                type,
-                description,
-                amount,
-                note
-            ]);
-
-            return true;
-        } catch (error) {
-            console.error('Error adding transaction:', error);
-            return false;
-        }
+        this.editingTransactionRow = transaction.rowIndex;
+        document.getElementById('modal-transaction-title').textContent = '✏️ Sửa giao dịch';
+        document.getElementById('transaction-type').value = transaction.type;
+        document.getElementById('transaction-desc').value = transaction.description;
+        document.getElementById('transaction-amount').value = transaction.amount;
+        document.getElementById('transaction-note').value = transaction.note;
+        document.getElementById('modal-transaction').classList.add('active');
     },
 
     /**
-     * Save transaction from form
+     * Add transaction programmatically (from Sales)
+     */
+    async addTransaction(type, description, amount, note = '') {
+        const id = 'TX' + Date.now().toString().slice(-8);
+        const date = new Date().toLocaleDateString('vi-VN');
+
+        await SheetsAPI.appendData(CONFIG.SHEETS.TRANSACTIONS, [
+            id,
+            date,
+            type,
+            description,
+            amount,
+            note
+        ]);
+
+        return id;
+    },
+
+    /**
+     * Save transaction (add or update)
      */
     async saveTransaction() {
         const type = document.getElementById('transaction-type').value;
@@ -141,8 +179,20 @@ const Transactions = {
         App.showLoading(true);
 
         try {
-            await this.addTransaction(type, description, amount, note);
-            App.showToast(`Đã thêm ${type === 'income' ? 'khoản thu' : 'khoản chi'}`);
+            if (this.editingTransactionRow) {
+                // Update existing transaction
+                const transaction = this.transactions.find(t => t.rowIndex === this.editingTransactionRow);
+                await SheetsAPI.updateData(
+                    `${CONFIG.SHEETS.TRANSACTIONS}!A${this.editingTransactionRow}:F${this.editingTransactionRow}`,
+                    [[transaction.id, transaction.date, type, description, amount, note]]
+                );
+                App.showToast('Đã cập nhật giao dịch');
+            } else {
+                // Add new transaction
+                await this.addTransaction(type, description, amount, note);
+                App.showToast(`Đã thêm ${type === 'income' ? 'khoản thu' : 'khoản chi'}`);
+            }
+
             this.closeModal();
             await this.loadTransactions();
         } catch (error) {
@@ -181,6 +231,7 @@ const Transactions = {
      */
     closeModal() {
         document.getElementById('modal-transaction').classList.remove('active');
+        this.editingTransactionRow = null;
     },
 
     /**
@@ -231,6 +282,13 @@ const Transactions = {
         document.getElementById('form-transaction').addEventListener('submit', (e) => {
             e.preventDefault();
             this.saveTransaction();
+        });
+
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.filterTransactions(btn.dataset.filter);
+            });
         });
     }
 };

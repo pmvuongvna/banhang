@@ -140,10 +140,16 @@
                 </div>
 
                 <div class="dashboard-sections">
-                    <div class="section recent-sales">
-                        <h3>🛒 Đơn hàng gần đây</h3>
-                        <div id="recent-sales-list" class="list-container">
-                            <p class="empty-state">Chưa có đơn hàng nào</p>
+                    <div class="section chart-section">
+                        <div class="chart-header">
+                            <h3>📊 Biểu đồ thu chi</h3>
+                            <select id="chart-period">
+                                <option value="week">7 ngày qua</option>
+                                <option value="month" selected>Tháng này</option>
+                            </select>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="income-expense-chart"></canvas>
                         </div>
                     </div>
                     <div class="section low-stock">
@@ -226,15 +232,47 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Sales History -->
+                <div class="sales-history">
+                    <div class="tab-header">
+                        <h3>📋 Lịch sử đơn hàng</h3>
+                        <button id="btn-add-sale" class="btn btn-outline">+ Thêm đơn cũ</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="sales-table">
+                            <thead>
+                                <tr>
+                                    <th>Mã đơn</th>
+                                    <th>Ngày giờ</th>
+                                    <th>Chi tiết</th>
+                                    <th>Tổng tiền</th>
+                                    <th>Ghi chú</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sales-tbody">
+                                <!-- Sales history will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </section>
 
             <!-- Transactions Tab -->
             <section id="tab-transactions" class="tab-content">
                 <div class="tab-header">
                     <h2>💰 Quản lý thu chi</h2>
-                    <div class="btn-group">
-                        <button id="btn-add-income" class="btn btn-success">+ Thu</button>
-                        <button id="btn-add-expense" class="btn btn-danger">+ Chi</button>
+                    <div class="header-actions">
+                        <div class="filter-group">
+                            <button class="filter-btn active" data-filter="all">Tất cả</button>
+                            <button class="filter-btn income" data-filter="income">📥 Thu</button>
+                            <button class="filter-btn expense" data-filter="expense">📤 Chi</button>
+                        </div>
+                        <div class="btn-group">
+                            <button id="btn-add-income" class="btn btn-success">+ Thu</button>
+                            <button id="btn-add-expense" class="btn btn-danger">+ Chi</button>
+                        </div>
                     </div>
                 </div>
                 <div class="transactions-summary">
@@ -259,6 +297,7 @@
                                 <th>Loại</th>
                                 <th>Mô tả</th>
                                 <th>Số tiền</th>
+                                <th>Ghi chú</th>
                                 <th>Thao tác</th>
                             </tr>
                         </thead>
@@ -385,6 +424,51 @@
         </div>
     </div>
 
+    <!-- Modal for Sale -->
+    <div id="modal-sale" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-sale-title">Sửa đơn hàng</h3>
+                <button class="btn-close" data-close="modal-sale">&times;</button>
+            </div>
+            <form id="form-sale">
+                <input type="hidden" id="sale-row" value="">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sale-id">Mã đơn</label>
+                        <input type="text" id="sale-id" placeholder="VD: DH001" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sale-datetime">Ngày giờ</label>
+                        <input type="text" id="sale-datetime" placeholder="VD: 4/2/2026, 10:30:00" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="sale-details">Chi tiết (SP x số lượng)</label>
+                    <input type="text" id="sale-details" placeholder="VD: Ắc quy Rocket x2, Bình 40Ah x1" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sale-total">Tổng tiền</label>
+                        <input type="number" id="sale-total" placeholder="0" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sale-profit">Lợi nhuận</label>
+                        <input type="number" id="sale-profit" placeholder="0" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="sale-note">Ghi chú</label>
+                    <input type="text" id="sale-note" placeholder="Ghi chú đơn hàng...">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modal-sale">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Lưu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="toast">
         <span id="toast-message"></span>
@@ -397,6 +481,7 @@
     </div>
 
     <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="config.js"></script>
@@ -405,6 +490,7 @@
     <script src="sales.js"></script>
     <script src="transactions.js"></script>
     <script src="reports.js"></script>
+    <script src="chart.js"></script>
     <script src="app.js"></script>
 </body>
 

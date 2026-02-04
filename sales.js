@@ -323,22 +323,143 @@ const Sales = {
         document.getElementById('stat-profit').textContent = Products.formatCurrency(todayProfit);
         document.getElementById('stat-orders').textContent = todayOrders;
 
-        // Recent sales
-        const recentSalesList = document.getElementById('recent-sales-list');
-        const recentSales = [...this.sales].reverse().slice(0, 5);
+        // Render sales history table
+        this.renderSalesHistory();
+    },
 
-        if (recentSales.length === 0) {
-            recentSalesList.innerHTML = '<p class="empty-state">Chưa có đơn hàng nào</p>';
-        } else {
-            recentSalesList.innerHTML = recentSales.map(s => `
-                <div class="list-item">
-                    <div>
-                        <div class="item-title">${s.id}</div>
-                        <div class="item-subtitle">${s.datetime}</div>
+    /**
+     * Render sales history table
+     */
+    renderSalesHistory() {
+        const tbody = document.getElementById('sales-tbody');
+        if (!tbody) return;
+
+        if (this.sales.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty-state">Chưa có đơn hàng nào</td>
+                </tr>
+            `;
+            return;
+        }
+
+        // Sort by date descending (newest first)
+        const sorted = [...this.sales].reverse();
+
+        tbody.innerHTML = sorted.map(s => `
+            <tr>
+                <td><strong>${s.id}</strong></td>
+                <td>${s.datetime}</td>
+                <td class="details-cell">${Products.escapeHtml(s.details)}</td>
+                <td style="font-weight: 600; color: var(--accent-success);">
+                    ${Products.formatCurrency(s.total)}
+                </td>
+                <td class="note-cell">${Products.escapeHtml(s.note)}</td>
+                <td>
+                    <div class="action-btns">
+                        <button class="action-btn edit" onclick="Sales.editSale('${s.id}')" title="Sửa">✏️</button>
+                        <button class="action-btn delete" onclick="Sales.deleteSale('${s.id}')" title="Xóa">🗑️</button>
                     </div>
-                    <div class="item-value">${Products.formatCurrency(s.total)}</div>
-                </div>
-            `).join('');
+                </td>
+            </tr>
+        `).join('');
+    },
+
+    /**
+     * Show add sale modal (for adding old orders)
+     */
+    showAddSaleModal() {
+        document.getElementById('modal-sale-title').textContent = '➕ Thêm đơn hàng cũ';
+        document.getElementById('form-sale').reset();
+        document.getElementById('sale-row').value = '';
+        document.getElementById('sale-id').value = 'DH' + Date.now().toString().slice(-8);
+        document.getElementById('sale-datetime').value = new Date().toLocaleString('vi-VN');
+        document.getElementById('modal-sale').classList.add('active');
+    },
+
+    /**
+     * Edit existing sale
+     */
+    editSale(id) {
+        const sale = this.sales.find(s => s.id === id);
+        if (!sale) return;
+
+        document.getElementById('modal-sale-title').textContent = '✏️ Sửa đơn hàng';
+        document.getElementById('sale-row').value = sale.rowIndex;
+        document.getElementById('sale-id').value = sale.id;
+        document.getElementById('sale-datetime').value = sale.datetime;
+        document.getElementById('sale-details').value = sale.details;
+        document.getElementById('sale-total').value = sale.total;
+        document.getElementById('sale-profit').value = sale.profit;
+        document.getElementById('sale-note').value = sale.note;
+        document.getElementById('modal-sale').classList.add('active');
+    },
+
+    /**
+     * Save sale (add or update)
+     */
+    async saveSale() {
+        const rowIndex = document.getElementById('sale-row').value;
+        const id = document.getElementById('sale-id').value.trim();
+        const datetime = document.getElementById('sale-datetime').value.trim();
+        const details = document.getElementById('sale-details').value.trim();
+        const total = parseFloat(document.getElementById('sale-total').value) || 0;
+        const profit = parseFloat(document.getElementById('sale-profit').value) || 0;
+        const note = document.getElementById('sale-note').value.trim();
+
+        if (!id || !datetime || !details || total <= 0) {
+            App.showToast('Vui lòng nhập đầy đủ thông tin', 'error');
+            return;
+        }
+
+        App.showLoading(true);
+
+        try {
+            if (rowIndex) {
+                // Update existing sale
+                await SheetsAPI.updateData(
+                    `${CONFIG.SHEETS.SALES}!A${rowIndex}:F${rowIndex}`,
+                    [[id, datetime, details, total, profit, note]]
+                );
+                App.showToast('Đã cập nhật đơn hàng');
+            } else {
+                // Add new sale
+                await SheetsAPI.appendData(CONFIG.SHEETS.SALES, [
+                    id, datetime, details, total, profit, note
+                ]);
+                App.showToast('Đã thêm đơn hàng');
+            }
+
+            document.getElementById('modal-sale').classList.remove('active');
+            await this.loadSales();
+        } catch (error) {
+            console.error('Error saving sale:', error);
+            App.showToast('Lỗi lưu đơn hàng', 'error');
+        } finally {
+            App.showLoading(false);
+        }
+    },
+
+    /**
+     * Delete sale
+     */
+    async deleteSale(id) {
+        if (!confirm('Bạn có chắc muốn xóa đơn hàng này?')) return;
+
+        const sale = this.sales.find(s => s.id === id);
+        if (!sale) return;
+
+        App.showLoading(true);
+
+        try {
+            await SheetsAPI.deleteRow(CONFIG.SHEETS.SALES, sale.rowIndex - 1);
+            App.showToast('Đã xóa đơn hàng');
+            await this.loadSales();
+        } catch (error) {
+            console.error('Error deleting sale:', error);
+            App.showToast('Lỗi xóa đơn hàng', 'error');
+        } finally {
+            App.showLoading(false);
         }
     },
 
@@ -359,6 +480,17 @@ const Sales = {
         // Checkout button
         document.getElementById('btn-checkout').addEventListener('click', () => {
             this.checkout();
+        });
+
+        // Add old sale button
+        document.getElementById('btn-add-sale')?.addEventListener('click', () => {
+            this.showAddSaleModal();
+        });
+
+        // Sale form submit
+        document.getElementById('form-sale')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveSale();
         });
     }
 };

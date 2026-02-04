@@ -121,6 +121,10 @@ const App = {
             Transactions.loadTransactions()
         ]);
         Reports.updateReports('month');
+
+        // Initialize and update dashboard chart
+        DashboardChart.init();
+        DashboardChart.updateChart('month');
     },
 
     /**
