@@ -112,6 +112,35 @@ const App = {
     },
 
     /**
+     * Handle linking existing sheet
+     */
+    async handleLinkSheet(e) {
+        e.preventDefault();
+
+        const sheetId = document.getElementById('sheet-id').value.trim();
+        if (!sheetId) {
+            this.showToast('Vui lòng nhập Sheet ID', 'error');
+            return;
+        }
+
+        this.showLoading(true);
+
+        try {
+            const result = await SheetsAPI.linkExistingSheet(sheetId);
+            this.showToast('Đã liên kết bảng dữ liệu thành công!', 'success');
+
+            document.getElementById('store-name-display').textContent = result.storeName;
+            await this.loadAllData();
+            this.showScreen('app-screen');
+        } catch (error) {
+            console.error('Error linking spreadsheet:', error);
+            this.showToast(error.message || 'Lỗi liên kết bảng dữ liệu', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    },
+
+    /**
      * Load all data from sheets
      */
     async loadAllData() {
@@ -250,6 +279,11 @@ const App = {
         // Setup form
         document.getElementById('setup-form').addEventListener('submit', (e) => {
             this.handleSetup(e);
+        });
+
+        // Link existing sheet form
+        document.getElementById('link-form').addEventListener('submit', (e) => {
+            this.handleLinkSheet(e);
         });
 
         // Logout button

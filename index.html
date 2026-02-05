@@ -46,18 +46,46 @@
         <div class="setup-container">
             <div class="setup-card">
                 <h2>🏪 Thiết lập cửa hàng</h2>
-                <p>Chào mừng! Hãy nhập thông tin cửa hàng của bạn.</p>
-                <form id="setup-form">
-                    <div class="form-group">
-                        <label for="store-name">Tên cửa hàng</label>
-                        <input type="text" id="store-name" placeholder="VD: Cửa hàng ABC" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span>Tạo bảng dữ liệu</span>
-                        <span class="icon">→</span>
-                    </button>
-                </form>
-                <p class="note">App sẽ tự động tạo Google Sheets với cấu trúc phù hợp</p>
+                <p>Chào mừng! Hãy chọn một trong hai cách bên dưới.</p>
+
+                <!-- Option 1: Create new -->
+                <div class="setup-option">
+                    <h3>📝 Tạo Sheet mới</h3>
+                    <form id="setup-form">
+                        <div class="form-group">
+                            <label for="store-name">Tên cửa hàng</label>
+                            <input type="text" id="store-name" placeholder="VD: Cửa hàng ABC">
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <span>Tạo bảng dữ liệu</span>
+                            <span class="icon">→</span>
+                        </button>
+                    </form>
+                </div>
+
+                <div class="setup-divider">
+                    <span>hoặc</span>
+                </div>
+
+                <!-- Option 2: Link existing -->
+                <div class="setup-option">
+                    <h3>🔗 Liên kết Sheet có sẵn</h3>
+                    <p class="note">Nếu bạn đã tạo Sheet trước đó, nhập Sheet ID để liên kết.</p>
+                    <form id="link-form">
+                        <div class="form-group">
+                            <label for="sheet-id">Sheet ID</label>
+                            <input type="text" id="sheet-id" placeholder="VD: 1ABC123xyz...">
+                        </div>
+                        <button type="submit" class="btn btn-outline">
+                            <span>Liên kết Sheet</span>
+                            <span class="icon">🔗</span>
+                        </button>
+                    </form>
+                    <p class="note help-text">
+                        💡 <strong>Cách lấy Sheet ID:</strong> Mở Google Drive → Tìm file "QLBH - ..." → Mở file →
+                        Copy phần giữa <code>/d/</code> và <code>/edit</code> trong URL.
+                    </p>
+                </div>
             </div>
         </div>
     </div>

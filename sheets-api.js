@@ -413,5 +413,45 @@ const SheetsAPI = {
         } catch (error) {
             return localStorage.getItem(CONFIG.STORAGE_KEYS.STORE_NAME) || 'Cửa hàng';
         }
+    },
+
+    /**
+     * Link an existing spreadsheet by ID
+     * Validates the spreadsheet structure before linking
+     */
+    async linkExistingSheet(sheetId) {
+        try {
+            // Try to access the spreadsheet
+            const response = await gapi.client.sheets.spreadsheets.get({
+                spreadsheetId: sheetId
+            });
+
+            // Check if it has the required sheets
+            const sheets = response.result.sheets.map(s => s.properties.title);
+            const requiredSheets = [CONFIG.SHEETS.PRODUCTS, CONFIG.SHEETS.SALES, CONFIG.SHEETS.TRANSACTIONS];
+            const missingSheets = requiredSheets.filter(s => !sheets.includes(s));
+
+            if (missingSheets.length > 0) {
+                throw new Error(`Sheet không hợp lệ. Thiếu các sheet: ${missingSheets.join(', ')}`);
+            }
+
+            // Save the sheet ID
+            this.spreadsheetId = sheetId;
+            localStorage.setItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID, sheetId);
+
+            // Try to get store name from settings
+            const storeName = await this.getStoreName();
+            localStorage.setItem(CONFIG.STORAGE_KEYS.STORE_NAME, storeName);
+
+            return { success: true, storeName };
+        } catch (error) {
+            console.error('Error linking spreadsheet:', error);
+            if (error.status === 404) {
+                throw new Error('Không tìm thấy Sheet với ID này. Vui lòng kiểm tra lại.');
+            } else if (error.status === 403) {
+                throw new Error('Bạn không có quyền truy cập Sheet này.');
+            }
+            throw error;
+        }
     }
 };

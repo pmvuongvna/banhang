@@ -229,6 +229,62 @@ body {
     margin-bottom: 24px;
 }
 
+.setup-option {
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-color);
+}
+
+.setup-option h3 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.setup-option .note {
+    margin-top: 8px;
+    margin-bottom: 12px;
+}
+
+.setup-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 20px 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.setup-divider::before,
+.setup-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.setup-divider span {
+    padding: 0 16px;
+}
+
+.help-text {
+    font-size: 0.75rem;
+    line-height: 1.5;
+    background: var(--bg-tertiary);
+    padding: 12px;
+    border-radius: var(--border-radius-sm);
+    margin-top: 12px;
+}
+
+.help-text code {
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
 /* ==========================================
    Buttons
    ========================================== */
