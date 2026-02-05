@@ -255,9 +255,9 @@ const Sales = {
                 await Products.updateStock(item.code, -item.quantity);
             }
 
-            // Add transaction (income) - show product names
+            // Add transaction (income) - show product names with actual note
             const productNames = this.cart.map(item => item.name).join(', ');
-            await Transactions.addTransaction('income', productNames, total, `Đơn: ${saleId}`);
+            await Transactions.addTransaction('income', productNames, total, note || `Đơn: ${saleId}`);
 
             // Clear cart, note and reload data
             this.cart = [];
@@ -330,7 +330,7 @@ const Sales = {
     /**
      * Render sales history table
      */
-    renderSalesHistory() {
+    renderSalesHistory(searchQuery = '') {
         const tbody = document.getElementById('sales-tbody');
         if (!tbody) return;
 
@@ -343,13 +343,40 @@ const Sales = {
             return;
         }
 
-        // Sort by date descending (newest first)
-        const sorted = [...this.sales].reverse();
+        // Filter by search query
+        let filtered = this.sales;
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = this.sales.filter(s =>
+                s.id.toLowerCase().includes(query) ||
+                s.details.toLowerCase().includes(query) ||
+                s.note.toLowerCase().includes(query)
+            );
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty-state">Không tìm thấy đơn hàng</td>
+                </tr>
+            `;
+            return;
+        }
+
+        // Sort by datetime (newest first)
+        const sorted = [...filtered].sort((a, b) => {
+            const dateA = this.parseVietnameseDateTime(a.datetime);
+            const dateB = this.parseVietnameseDateTime(b.datetime);
+            return dateB - dateA; // Descending order
+        });
 
         tbody.innerHTML = sorted.map(s => `
             <tr>
                 <td><strong>${s.id}</strong></td>
-                <td>${s.datetime}</td>
+                <td class="editable-cell" data-sale-id="${s.id}" data-field="datetime">
+                    ${s.datetime}
+                    <span class="edit-hint">✏️</span>
+                </td>
                 <td class="details-cell">${Products.escapeHtml(s.details)}</td>
                 <td style="font-weight: 600; color: var(--accent-success);">
                     ${Products.formatCurrency(s.total)}
@@ -363,6 +390,40 @@ const Sales = {
                 </td>
             </tr>
         `).join('');
+
+        // Make datetime cells editable
+        tbody.querySelectorAll('.editable-cell[data-field="datetime"]').forEach(cell => {
+            InlineEdit.makeEditable(cell, async (newValue) => {
+                const saleId = cell.dataset.saleId;
+                await InlineEdit.updateSaleDatetime(saleId, newValue);
+            });
+        });
+    },
+
+    /**
+     * Parse Vietnamese datetime string to Date object
+     * Format: "4/2/2026, 10:30:00" or "4/2/2026"
+     */
+    parseVietnameseDateTime(dateTimeStr) {
+        if (!dateTimeStr) return new Date(0);
+
+        try {
+            // Split date and time
+            const parts = dateTimeStr.split(', ');
+            const datePart = parts[0]; // "4/2/2026"
+            const timePart = parts[1] || '00:00:00'; // "10:30:00" or default
+
+            // Parse date (d/m/yyyy)
+            const [day, month, year] = datePart.split('/').map(Number);
+
+            // Parse time (hh:mm:ss)
+            const [hours, minutes, seconds] = timePart.split(':').map(Number);
+
+            return new Date(year, month - 1, day, hours || 0, minutes || 0, seconds || 0);
+        } catch (error) {
+            console.error('Error parsing date:', dateTimeStr, error);
+            return new Date(0);
+        }
     },
 
     /**
@@ -491,6 +552,11 @@ const Sales = {
         document.getElementById('form-sale')?.addEventListener('submit', (e) => {
             e.preventDefault();
             this.saveSale();
+        });
+
+        // Sales history search
+        document.getElementById('search-sales')?.addEventListener('input', (e) => {
+            this.renderSalesHistory(e.target.value);
         });
     }
 };

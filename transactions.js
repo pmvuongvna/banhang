@@ -75,7 +75,10 @@ const Transactions = {
 
         tbody.innerHTML = sorted.map(t => `
             <tr>
-                <td>${t.date}</td>
+                <td class="editable-cell" data-transaction-id="${t.id}" data-field="date">
+                    ${t.date}
+                    <span class="edit-hint">✏️</span>
+                </td>
                 <td>
                     <span class="transaction-type ${t.type}">
                         ${t.type === 'income' ? '📥 Thu' : '📤 Chi'}
@@ -94,6 +97,14 @@ const Transactions = {
                 </td>
             </tr>
         `).join('');
+
+        // Make date cells editable
+        tbody.querySelectorAll('.editable-cell[data-field="date"]').forEach(cell => {
+            InlineEdit.makeEditable(cell, async (newValue) => {
+                const transactionId = cell.dataset.transactionId;
+                await InlineEdit.updateTransactionDate(transactionId, newValue);
+            });
+        });
     },
 
     /**

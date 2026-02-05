@@ -1,0 +1,43 @@
+/* ==========================================
+   Editable Cells
+   ========================================== */
+.editable-cell {
+    cursor: pointer;
+    position: relative;
+    padding: 8px 12px;
+    transition: background var(--transition-fast);
+}
+
+.editable-cell:hover {
+    background: var(--bg-tertiary);
+    outline: 1px dashed var(--accent-primary);
+}
+
+.editable-cell.editing {
+    padding: 0;
+}
+
+.editable-cell input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px solid var(--accent-primary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: inherit;
+    font-family: inherit;
+    outline: none;
+}
+
+.editable-cell .edit-hint {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.editable-cell:hover .edit-hint {
+    opacity: 1;
+}

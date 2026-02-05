@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="editable-cells.css">
 </head>
 
 <body>
@@ -267,6 +268,9 @@
                         <h3>📋 Lịch sử đơn hàng</h3>
                         <button id="btn-add-sale" class="btn btn-outline">+ Thêm đơn cũ</button>
                     </div>
+                    <div class="search-bar">
+                        <input type="text" id="search-sales" placeholder="🔍 Tìm theo mã đơn, chi tiết, ghi chú...">
+                    </div>
                     <div class="table-container">
                         <table class="data-table" id="sales-table">
                             <thead>
@@ -519,6 +523,7 @@
     <script src="transactions.js"></script>
     <script src="reports.js"></script>
     <script src="chart.js"></script>
+    <script src="inline-edit.js"></script>
     <script src="app.js"></script>
 </body>
 
