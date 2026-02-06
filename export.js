@@ -14,6 +14,47 @@ const ExportReport = {
     },
 
     /**
+     * Helper: Parse date safely handling multiple formats
+     */
+    parseDateSafe(str) {
+        if (!str) return null;
+        try {
+            // Remove time part (split by comma or space if time follows)
+            // Expect formats: "d/m/y", "d/m/y, time", "d-m-y", "y-m-d"
+            let datePart = str.split(',')[0].trim();
+            // If space exists, might be "d/m/y HH:mm"
+            if (datePart.includes(' ') && datePart.includes(':')) {
+                datePart = datePart.split(' ')[0].trim();
+            }
+
+            // Split by / or -
+            const parts = datePart.split(/[\/\-]/);
+
+            if (parts.length === 3) {
+                const p0 = parseInt(parts[0]);
+                const p1 = parseInt(parts[1]);
+                const p2 = parseInt(parts[2]);
+
+                // Detect YYYY-MM-DD vs DD-MM-YYYY
+                if (p0 > 1000) {
+                    // YYYY-MM-DD
+                    return new Date(p0, p1 - 1, p2);
+                } else {
+                    // DD-MM-YYYY
+                    return new Date(p2, p1 - 1, p0);
+                }
+            }
+
+            // Fallback to standard Date parse
+            const d = new Date(str);
+            return isNaN(d.getTime()) ? null : d;
+        } catch (e) {
+            console.warn('Date parse error:', str, e);
+            return null;
+        }
+    },
+
+    /**
      * Generate monthly report data
      */
     generateMonthlyReport(month, year) {
@@ -21,31 +62,32 @@ const ExportReport = {
 
         // Filter sales by month/year
         const sales = Sales.sales.filter(s => {
-            // Ensure parseVietnameseDateTime exists, fallback if needed
-            let date;
-            if (typeof Sales.parseVietnameseDateTime === 'function') {
-                date = Sales.parseVietnameseDateTime(s.datetime);
-            } else {
-                // Formatting fallback parsing
-                const parts = s.datetime.split(',')[0].split('/');
-                date = new Date(parts[2], parts[1] - 1, parts[0]);
+            const date = this.parseDateSafe(s.datetime);
+            if (!date) {
+                console.warn('Invalid date:', s.datetime);
+                return false;
             }
 
-            return date.getMonth() === month - 1 && date.getFullYear() === year;
+            const match = date.getMonth() === month - 1 && date.getFullYear() === year;
+            if (match) {
+                console.log('Found sale:', s.datetime, s.total);
+            }
+            return match;
         });
+
+        if (sales.length === 0) {
+            const msg = `Không tìm thấy dữ liệu cho Tháng ${month}/${year}. Vui lòng kiểm tra lại ngày tháng.`;
+            try { App.showToast(msg, 'warning'); } catch (e) { }
+            console.warn(msg);
+        }
 
         // Group by date
         const dailyData = {};
 
         // Add sales revenue
         sales.forEach(s => {
-            let date;
-            if (typeof Sales.parseVietnameseDateTime === 'function') {
-                date = Sales.parseVietnameseDateTime(s.datetime);
-            } else {
-                const parts = s.datetime.split(',')[0].split('/');
-                date = new Date(parts[2], parts[1] - 1, parts[0]);
-            }
+            const date = this.parseDateSafe(s.datetime);
+            if (!date) return;
 
             const dateKey = `${date.getDate()}/${month}/${year}`;
 
@@ -54,7 +96,7 @@ const ExportReport = {
                     date: dateKey,
                     day: date.getDate(),
                     revenue: 0,
-                    description: 'Doanh thu bán hàng' // Fixed description as requested
+                    description: 'Doanh thu bán hàng'
                 };
             }
 
