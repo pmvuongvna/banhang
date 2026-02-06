@@ -1,6 +1,6 @@
 /**
  * QLBH - Export Module
- * Handles exporting reports to Excel format with formatting using SheetJS
+ * Handles exporting reports to Excel format matching baocao.xlsx template
  */
 
 const ExportReport = {
@@ -88,7 +88,7 @@ const ExportReport = {
     },
 
     /**
-     * Export to Excel format with formatting using SheetJS
+     * Export to Excel format with formatting matching baocao.xlsx template
      */
     exportMonthlyExcel(month, year) {
         const data = this.generateMonthlyReport(month, year);
@@ -96,17 +96,28 @@ const ExportReport = {
 
         // Create workbook
         const wb = XLSX.utils.book_new();
-
-        // Prepare data array
         const excelData = [];
 
-        // Title row
-        excelData.push([`SỔ CHI TIẾT DOANH THU CHI PHÍ`]);
-        excelData.push([`Tháng ${month} năm ${year}`]);
+        // Row 1: Header left and right
+        excelData.push(['HỘ, CÁ NHÂN KINH DOANH:......', '', '', '', '', 'Mẫu số S2c-HKD']);
+        excelData.push(['Mã số thuế:........................................', '', '', '', '', '(Kèm theo Thông tư']);
+        excelData.push(['Địa chỉ:............................................', '', '', '', '', `số 152/2025/TT-BTC`]);
+        excelData.push(['', '', '', '', '', `ngày 31 tháng 12 năm`]);
+        excelData.push(['', '', '', '', '', `2025 của Bộ trưởng`]);
         excelData.push([]); // Empty row
 
-        // Header row
-        excelData.push(['Số hiệu', 'Ngày tháng', 'Diễn giải', 'Số tiền']);
+        // Row 7: Title
+        excelData.push(['', '', 'SỔ CHI TIẾT DOANH THU, CHI PHÍ']);
+        excelData.push(['', '', `Địa điểm kinh doanh:................................`]);
+        excelData.push(['', '', `Kỳ kế khai:................................................`]);
+        excelData.push([]); // Empty row
+
+        // Row 11: "Đơn vị tính:" aligned right
+        excelData.push(['', '', '', '', '', 'Đơn vị tính:']);
+
+        // Row 12: Table header
+        excelData.push(['', 'Chứng từ', '', 'Diễn giải', '', 'Số tiền']);
+        excelData.push(['Số hiệu', 'Ngày, tháng', '', '', '', '']);
 
         // Data rows - only include days with revenue
         let rowNumber = 1;
@@ -115,18 +126,31 @@ const ExportReport = {
                 excelData.push([
                     rowNumber,
                     row.date,
+                    '',
                     row.description,
+                    '',
                     row.revenue
                 ]);
                 rowNumber++;
             }
         });
 
-        // Empty row before total
-        excelData.push([]);
+        // Add empty rows to make it look like the template (at least 8 rows)
+        const dataRowCount = rowNumber - 1;
+        for (let i = dataRowCount; i < 8; i++) {
+            excelData.push(['', '', '', '', '', '']);
+        }
 
         // Total row
-        excelData.push(['', 'Tổng cộng', '', totalRevenue]);
+        const totalRowIndex = excelData.length;
+        excelData.push(['', 'Tổng cộng', '', '', '', totalRevenue]);
+
+        // Footer
+        excelData.push([]); // Empty row
+        excelData.push(['', '', `Ngày ... tháng ... năm ...`]);
+        excelData.push(['', '', 'NGƯỜI ĐẠI DIỆN HỘ KINH DOANH/']);
+        excelData.push(['', '', 'CÁ NHÂN KINH DOANH']);
+        excelData.push(['', '', '(Ký, họ tên, đóng dấu)']);
 
         // Create worksheet
         const ws = XLSX.utils.aoa_to_sheet(excelData);
@@ -135,25 +159,43 @@ const ExportReport = {
         ws['!cols'] = [
             { wch: 10 },  // Số hiệu
             { wch: 15 },  // Ngày tháng
+            { wch: 5 },   // Empty
             { wch: 40 },  // Diễn giải
+            { wch: 5 },   // Empty
             { wch: 15 }   // Số tiền
         ];
 
-        // Merge cells for title
+        // Merge cells
         ws['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }, // Title row
-            { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }  // Subtitle row
+            // Header left (rows 1-3, cols A-E)
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
+            { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } },
+
+            // Title (row 7, cols C-F)
+            { s: { r: 6, c: 2 }, e: { r: 6, c: 5 } },
+            { s: { r: 7, c: 2 }, e: { r: 7, c: 5 } },
+            { s: { r: 8, c: 2 }, e: { r: 8, c: 5 } },
+
+            // Table header "Chứng từ" (row 12, cols B-C)
+            { s: { r: 11, c: 1 }, e: { r: 11, c: 2 } },
+
+            // Table header "Diễn giải" (row 12, cols D-E)
+            { s: { r: 11, c: 3 }, e: { r: 11, c: 4 } },
+
+            // Footer
+            { s: { r: totalRowIndex + 2, c: 2 }, e: { r: totalRowIndex + 2, c: 5 } },
+            { s: { r: totalRowIndex + 3, c: 2 }, e: { r: totalRowIndex + 3, c: 5 } },
+            { s: { r: totalRowIndex + 4, c: 2 }, e: { r: totalRowIndex + 4, c: 5 } },
+            { s: { r: totalRowIndex + 5, c: 2 }, e: { r: totalRowIndex + 5, c: 5 } }
         ];
 
-        // Apply styles (note: styles require xlsx-style or pro version)
-        // For basic version, we'll set number format for currency column
+        // Format number cells
         const range = XLSX.utils.decode_range(ws['!ref']);
-
-        // Format currency cells (column D, starting from row 5)
-        for (let row = 4; row <= range.e.r; row++) {
-            const cellAddress = XLSX.utils.encode_cell({ r: row, c: 3 });
+        for (let row = 13; row <= range.e.r; row++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: 5 });
             if (ws[cellAddress] && typeof ws[cellAddress].v === 'number') {
-                ws[cellAddress].z = '#,##0'; // Number format
+                ws[cellAddress].z = '#,##0';
             }
         }
 
