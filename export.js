@@ -17,38 +17,46 @@ const ExportReport = {
      * Generate monthly report data
      */
     generateMonthlyReport(month, year) {
+        console.log('Generating report for month:', month, 'year:', year);
+        console.log('Total sales:', Sales.sales.length);
+
         const sales = Sales.sales.filter(s => {
             const date = Sales.parseVietnameseDateTime(s.datetime);
-            return date.getMonth() === month - 1 && date.getFullYear() === year;
+            const match = date.getMonth() === month - 1 && date.getFullYear() === year;
+            if (match) {
+                console.log('Matched sale:', s.id, s.datetime, s.total);
+            }
+            return match;
         });
+
+        console.log('Filtered sales:', sales.length);
 
         // Group by date
         const dailyData = {};
-        const daysInMonth = new Date(year, month, 0).getDate();
-
-        // Initialize all days
-        for (let day = 1; day <= daysInMonth; day++) {
-            const dateKey = `${day}/${month}/${year}`;
-            dailyData[dateKey] = {
-                date: dateKey,
-                day: day,
-                revenue: 0,
-                description: `Doanh thu ngày ${day}/${month}/${year}`
-            };
-        }
 
         // Add sales revenue
         sales.forEach(s => {
             const date = Sales.parseVietnameseDateTime(s.datetime);
             const dateKey = `${date.getDate()}/${month}/${year}`;
-            if (dailyData[dateKey]) {
-                dailyData[dateKey].revenue += s.total;
+
+            if (!dailyData[dateKey]) {
+                dailyData[dateKey] = {
+                    date: dateKey,
+                    day: date.getDate(),
+                    revenue: 0,
+                    description: `Doanh thu ngày ${date.getDate()}/${month}/${year}`
+                };
             }
+
+            dailyData[dateKey].revenue += s.total;
         });
 
-        // Convert to array and calculate total revenue
-        const rows = Object.values(dailyData);
+        // Convert to array and sort by day
+        const rows = Object.values(dailyData).sort((a, b) => a.day - b.day);
         const totalRevenue = rows.reduce((sum, r) => sum + r.revenue, 0);
+
+        console.log('Total revenue:', totalRevenue);
+        console.log('Rows:', rows.length);
 
         return { rows, totalRevenue, month, year };
     },
@@ -68,16 +76,12 @@ const ExportReport = {
         // Column headers
         csv += `Số hiệu,Ngày tháng,Diễn giải,Số tiền\n`;
 
-        // Data rows - only include days with revenue
-        let rowNumber = 1;
-        rows.forEach((row) => {
-            if (row.revenue > 0) {
-                csv += `${rowNumber},`;
-                csv += `${row.date},`;
-                csv += `"${row.description}",`;
-                csv += `${row.revenue}\n`;
-                rowNumber++;
-            }
+        // Data rows
+        rows.forEach((row, index) => {
+            csv += `${index + 1},`;
+            csv += `${row.date},`;
+            csv += `"${row.description}",`;
+            csv += `${row.revenue}\n`;
         });
 
         // Totals row
@@ -94,134 +98,125 @@ const ExportReport = {
         const data = this.generateMonthlyReport(month, year);
         const { rows, totalRevenue } = data;
 
+        if (!window.XLSX) {
+            App.showToast('Lỗi: Thư viện XLSX chưa load', 'error');
+            return;
+        }
+
         // Create workbook
         const wb = XLSX.utils.book_new();
-        const excelData = [];
+        const ws_data = [];
 
-        // Row 1: Header left and right
-        excelData.push(['HỘ, CÁ NHÂN KINH DOANH:......', '', '', '', '', 'Mẫu số S2c-HKD']);
-        excelData.push(['Mã số thuế:........................................', '', '', '', '', '(Kèm theo Thông tư']);
-        excelData.push(['Địa chỉ:............................................', '', '', '', '', `số 152/2025/TT-BTC`]);
-        excelData.push(['', '', '', '', '', `ngày 31 tháng 12 năm`]);
-        excelData.push(['', '', '', '', '', `2025 của Bộ trưởng`]);
-        excelData.push([]); // Empty row
+        // Row 1-3: Header
+        ws_data.push(['HỘ, CÁ NHÂN KINH DOANH:......', '', '', '', 'Mẫu số S2c-HKD']);
+        ws_data.push(['Mã số thuế:........................................', '', '', '', '(Kèm theo Thông tư']);
+        ws_data.push(['Địa chỉ:............................................', '', '', '', 'số 152/2025/TT-BTC']);
+        ws_data.push(['', '', '', '', 'ngày 31 tháng 12 năm']);
+        ws_data.push(['', '', '', '', '2025 của Bộ trưởng']);
+        ws_data.push([]); // Row 6: Empty
 
-        // Row 7: Title
-        excelData.push(['', '', 'SỔ CHI TIẾT DOANH THU, CHI PHÍ']);
-        excelData.push(['', '', `Địa điểm kinh doanh:................................`]);
-        excelData.push(['', '', `Kỳ kế khai:................................................`]);
-        excelData.push([]); // Empty row
+        // Row 7-9: Title
+        ws_data.push(['', 'SỔ CHI TIẾT DOANH THU, CHI PHÍ']);
+        ws_data.push(['', `Địa điểm kinh doanh:................................`]);
+        ws_data.push(['', `Kỳ kế khai:................................................`]);
+        ws_data.push([]); // Row 10: Empty
 
-        // Row 11: "Đơn vị tính:" aligned right
-        excelData.push(['', '', '', '', '', 'Đơn vị tính:']);
+        // Row 11: "Đơn vị tính:"
+        ws_data.push(['', '', '', '', 'Đơn vị tính:']);
 
-        // Row 12: Table header
-        excelData.push(['', 'Chứng từ', '', 'Diễn giải', '', 'Số tiền']);
-        excelData.push(['Số hiệu', 'Ngày, tháng', '', '', '', '']);
+        // Row 12-13: Table header
+        ws_data.push(['', 'Chứng từ', '', 'Diễn giải', 'Số tiền']);
+        ws_data.push(['Số hiệu', 'Ngày, tháng', '', '', '']);
 
-        // Data rows - only include days with revenue
-        let rowNumber = 1;
-        rows.forEach((row) => {
-            if (row.revenue > 0) {
-                excelData.push([
-                    rowNumber,
-                    row.date,
-                    '',
-                    row.description,
-                    '',
-                    row.revenue
-                ]);
-                rowNumber++;
-            }
+        // Data rows
+        rows.forEach((row, index) => {
+            ws_data.push([
+                index + 1,           // Số hiệu
+                row.date,            // Ngày tháng
+                '',                  // Empty
+                row.description,     // Diễn giải
+                row.revenue          // Số tiền
+            ]);
         });
 
-        // Add empty rows to make it look like the template (at least 8 rows)
-        const dataRowCount = rowNumber - 1;
-        for (let i = dataRowCount; i < 8; i++) {
-            excelData.push(['', '', '', '', '', '']);
+        // Add empty rows if needed (minimum 5 data rows)
+        while (ws_data.length < 18) {
+            ws_data.push(['', '', '', '', '']);
         }
 
         // Total row
-        const totalRowIndex = excelData.length;
-        excelData.push(['', 'Tổng cộng', '', '', '', totalRevenue]);
+        ws_data.push(['', 'Tổng cộng', '', '', totalRevenue]);
+        ws_data.push([]); // Empty
 
         // Footer
-        excelData.push([]); // Empty row
-        excelData.push(['', '', `Ngày ... tháng ... năm ...`]);
-        excelData.push(['', '', 'NGƯỜI ĐẠI DIỆN HỘ KINH DOANH/']);
-        excelData.push(['', '', 'CÁ NHÂN KINH DOANH']);
-        excelData.push(['', '', '(Ký, họ tên, đóng dấu)']);
+        ws_data.push(['', '', 'Ngày ... tháng ... năm ...']);
+        ws_data.push(['', '', 'NGƯỜI ĐẠI DIỆN HỘ KINH DOANH/']);
+        ws_data.push(['', '', 'CÁ NHÂN KINH DOANH']);
+        ws_data.push(['', '', '(Ký, họ tên, đóng dấu)']);
 
         // Create worksheet
-        const ws = XLSX.utils.aoa_to_sheet(excelData);
+        const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
         // Set column widths
         ws['!cols'] = [
-            { wch: 10 },  // Số hiệu
-            { wch: 15 },  // Ngày tháng
-            { wch: 5 },   // Empty
-            { wch: 40 },  // Diễn giải
-            { wch: 5 },   // Empty
-            { wch: 15 }   // Số tiền
+            { wch: 10 },  // A: Số hiệu
+            { wch: 15 },  // B: Ngày tháng / Chứng từ
+            { wch: 5 },   // C: Empty
+            { wch: 40 },  // D: Diễn giải
+            { wch: 15 }   // E: Số tiền
         ];
 
         // Merge cells
-        ws['!merges'] = [
-            // Header left (rows 1-3, cols A-E)
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
-            { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
-            { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } },
+        const merges = [];
 
-            // Title (row 7, cols C-F)
-            { s: { r: 6, c: 2 }, e: { r: 6, c: 5 } },
-            { s: { r: 7, c: 2 }, e: { r: 7, c: 5 } },
-            { s: { r: 8, c: 2 }, e: { r: 8, c: 5 } },
+        // Header (rows 1-5)
+        merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }); // Row 1 left
+        merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }); // Row 2 left
+        merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: 3 } }); // Row 3 left
 
-            // Table header "Chứng từ" (row 12, cols B-C)
-            { s: { r: 11, c: 1 }, e: { r: 11, c: 2 } },
+        // Title (rows 7-9)
+        merges.push({ s: { r: 6, c: 1 }, e: { r: 6, c: 4 } }); // Title
+        merges.push({ s: { r: 7, c: 1 }, e: { r: 7, c: 4 } }); // Địa điểm
+        merges.push({ s: { r: 8, c: 1 }, e: { r: 8, c: 4 } }); // Kỳ kế khai
 
-            // Table header "Diễn giải" (row 12, cols D-E)
-            { s: { r: 11, c: 3 }, e: { r: 11, c: 4 } },
+        // Table header (row 12)
+        merges.push({ s: { r: 11, c: 1 }, e: { r: 11, c: 2 } }); // "Chứng từ"
 
-            // Footer
-            { s: { r: totalRowIndex + 2, c: 2 }, e: { r: totalRowIndex + 2, c: 5 } },
-            { s: { r: totalRowIndex + 3, c: 2 }, e: { r: totalRowIndex + 3, c: 5 } },
-            { s: { r: totalRowIndex + 4, c: 2 }, e: { r: totalRowIndex + 4, c: 5 } },
-            { s: { r: totalRowIndex + 5, c: 2 }, e: { r: totalRowIndex + 5, c: 5 } }
-        ];
+        ws['!merges'] = merges;
 
-        // Format number cells
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        for (let row = 13; row <= range.e.r; row++) {
-            const cellAddress = XLSX.utils.encode_cell({ r: row, c: 5 });
-            if (ws[cellAddress] && typeof ws[cellAddress].v === 'number') {
-                ws[cellAddress].z = '#,##0';
+        // Format numbers
+        const startDataRow = 13;
+        const endDataRow = startDataRow + rows.length;
+        for (let r = startDataRow; r <= endDataRow; r++) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c: 4 })];
+            if (cell && typeof cell.v === 'number') {
+                cell.z = '#,##0';
             }
         }
 
         // Add worksheet to workbook
-        XLSX.utils.book_append_sheet(wb, ws, `Tháng ${month}`);
+        XLSX.utils.book_append_sheet(wb, ws, `Tháng ${month}-${year}`);
 
-        // Generate Excel file
-        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        // Write and download
+        try {
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([wbout], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
 
-        // Download
-        const filename = `Bao_cao_thang_${month}_${year}.xlsx`;
-        const link = document.createElement('a');
-
-        if (navigator.msSaveBlob) {
-            navigator.msSaveBlob(blob, filename);
-        } else {
+            const filename = `Bao_cao_thang_${month}_${year}.xlsx`;
+            const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = filename;
-            link.style.display = 'none';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        }
 
-        App.showToast(`Đã xuất báo cáo Excel: ${filename}`, 'success');
+            App.showToast(`Đã xuất báo cáo: ${filename}`, 'success');
+        } catch (error) {
+            console.error('Export error:', error);
+            App.showToast('Lỗi xuất file: ' + error.message, 'error');
+        }
     },
 
     /**
@@ -230,18 +225,11 @@ const ExportReport = {
     downloadFile(content, filename, mimeType) {
         const blob = new Blob([content], { type: mimeType });
         const link = document.createElement('a');
-
-        if (navigator.msSaveBlob) {
-            navigator.msSaveBlob(blob, filename);
-        } else {
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         App.showToast(`Đã xuất báo cáo: ${filename}`, 'success');
     },
 
