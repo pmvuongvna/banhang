@@ -344,13 +344,16 @@
             <section id="tab-reports" class="tab-content">
                 <div class="tab-header">
                     <h2>📊 Báo cáo thống kê</h2>
-                    <div class="date-filter">
-                        <select id="report-period">
-                            <option value="today">Hôm nay</option>
-                            <option value="week">Tuần này</option>
-                            <option value="month" selected>Tháng này</option>
-                            <option value="all">Tất cả</option>
-                        </select>
+                    <div class="header-actions">
+                        <div class="date-filter">
+                            <select id="report-period">
+                                <option value="today">Hôm nay</option>
+                                <option value="week">Tuần này</option>
+                                <option value="month" selected>Tháng này</option>
+                                <option value="all">Tất cả</option>
+                            </select>
+                        </div>
+                        <button id="btn-export-report" class="btn btn-success">📥 Xuất báo cáo</button>
                     </div>
                 </div>
                 <div class="reports-grid">
@@ -501,6 +504,52 @@
         </div>
     </div>
 
+    <!-- Modal for Export -->
+    <div id="modal-export" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📥 Xuất báo cáo</h3>
+                <button class="btn-close" data-close="modal-export">&times;</button>
+            </div>
+            <form id="form-export">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="export-month">Tháng</label>
+                        <select id="export-month" required>
+                            <option value="1">Tháng 1</option>
+                            <option value="2">Tháng 2</option>
+                            <option value="3">Tháng 3</option>
+                            <option value="4">Tháng 4</option>
+                            <option value="5">Tháng 5</option>
+                            <option value="6">Tháng 6</option>
+                            <option value="7">Tháng 7</option>
+                            <option value="8">Tháng 8</option>
+                            <option value="9">Tháng 9</option>
+                            <option value="10">Tháng 10</option>
+                            <option value="11">Tháng 11</option>
+                            <option value="12">Tháng 12</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="export-year">Năm</label>
+                        <input type="number" id="export-year" placeholder="2026" min="2020" max="2100" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="export-format">Định dạng</label>
+                    <select id="export-format" required>
+                        <option value="csv">CSV (Excel, Google Sheets)</option>
+                        <option value="excel">Excel (.xls)</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modal-export">Hủy</button>
+                    <button type="submit" class="btn btn-success">📥 Xuất file</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="toast">
         <span id="toast-message"></span>
@@ -524,6 +573,7 @@
     <script src="reports.js"></script>
     <script src="chart.js"></script>
     <script src="inline-edit.js"></script>
+    <script src="export.js"></script>
     <script src="app.js"></script>
 </body>
 

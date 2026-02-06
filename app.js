@@ -333,6 +333,27 @@ const App = {
                 });
             }
         });
+
+        // Export button
+        document.getElementById('btn-export-report')?.addEventListener('click', () => {
+            ExportReport.showExportDialog();
+        });
+
+        // Export form submit
+        document.getElementById('form-export')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const month = parseInt(document.getElementById('export-month').value);
+            const year = parseInt(document.getElementById('export-year').value);
+            const format = document.getElementById('export-format').value;
+
+            if (format === 'csv') {
+                ExportReport.exportMonthlyCSV(month, year);
+            } else {
+                ExportReport.exportMonthlyExcel(month, year);
+            }
+
+            document.getElementById('modal-export').classList.remove('active');
+        });
     }
 };
 
