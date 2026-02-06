@@ -1,6 +1,6 @@
 /**
  * QLBH - Export Module
- * Handles exporting reports to Excel format matching baocao.xlsx template
+ * Handles exporting reports to Excel format matching baocao.xlsx template with styling
  */
 
 const ExportReport = {
@@ -18,25 +18,35 @@ const ExportReport = {
      */
     generateMonthlyReport(month, year) {
         console.log('Generating report for month:', month, 'year:', year);
-        console.log('Total sales:', Sales.sales.length);
 
+        // Filter sales by month/year
         const sales = Sales.sales.filter(s => {
-            const date = Sales.parseVietnameseDateTime(s.datetime);
-            const match = date.getMonth() === month - 1 && date.getFullYear() === year;
-            if (match) {
-                console.log('Matched sale:', s.id, s.datetime, s.total);
+            // Ensure parseVietnameseDateTime exists, fallback if needed
+            let date;
+            if (typeof Sales.parseVietnameseDateTime === 'function') {
+                date = Sales.parseVietnameseDateTime(s.datetime);
+            } else {
+                // Formatting fallback parsing
+                const parts = s.datetime.split(',')[0].split('/');
+                date = new Date(parts[2], parts[1] - 1, parts[0]);
             }
-            return match;
-        });
 
-        console.log('Filtered sales:', sales.length);
+            return date.getMonth() === month - 1 && date.getFullYear() === year;
+        });
 
         // Group by date
         const dailyData = {};
 
         // Add sales revenue
         sales.forEach(s => {
-            const date = Sales.parseVietnameseDateTime(s.datetime);
+            let date;
+            if (typeof Sales.parseVietnameseDateTime === 'function') {
+                date = Sales.parseVietnameseDateTime(s.datetime);
+            } else {
+                const parts = s.datetime.split(',')[0].split('/');
+                date = new Date(parts[2], parts[1] - 1, parts[0]);
+            }
+
             const dateKey = `${date.getDate()}/${month}/${year}`;
 
             if (!dailyData[dateKey]) {
@@ -44,7 +54,7 @@ const ExportReport = {
                     date: dateKey,
                     day: date.getDate(),
                     revenue: 0,
-                    description: `Doanh thu ngày ${date.getDate()}/${month}/${year}`
+                    description: 'Doanh thu bán hàng' // Fixed description as requested
                 };
             }
 
@@ -54,9 +64,6 @@ const ExportReport = {
         // Convert to array and sort by day
         const rows = Object.values(dailyData).sort((a, b) => a.day - b.day);
         const totalRevenue = rows.reduce((sum, r) => sum + r.revenue, 0);
-
-        console.log('Total revenue:', totalRevenue);
-        console.log('Rows:', rows.length);
 
         return { rows, totalRevenue, month, year };
     },
@@ -103,94 +110,248 @@ const ExportReport = {
             return;
         }
 
+        // Define styles
+        const borderStyle = {
+            top: { style: "thin" },
+            bottom: { style: "thin" },
+            left: { style: "thin" },
+            right: { style: "thin" }
+        };
+
+        const fontBase = { name: "Times New Roman", sz: 12 };
+        const fontBold = { name: "Times New Roman", sz: 12, bold: true };
+        const fontTitle = { name: "Times New Roman", sz: 14, bold: true };
+
+        const styleCenter = {
+            font: fontBase,
+            alignment: { vertical: "center", horizontal: "center", wrapText: true }
+        };
+
+        const styleLeft = {
+            font: fontBase,
+            alignment: { vertical: "center", horizontal: "left", wrapText: true }
+        };
+
+        const styleBoldCenter = {
+            font: fontBold,
+            alignment: { vertical: "center", horizontal: "center", wrapText: true }
+        };
+
+        const styleHeader = {
+            font: fontBold,
+            alignment: { vertical: "center", horizontal: "center", wrapText: true },
+            border: borderStyle
+        };
+
+        const styleCellCenter = {
+            font: fontBase,
+            alignment: { vertical: "center", horizontal: "center", wrapText: true },
+            border: borderStyle
+        };
+
+        const styleCellLeft = {
+            font: fontBase,
+            alignment: { vertical: "center", horizontal: "left", wrapText: true },
+            border: borderStyle
+        };
+
+        const styleCurrency = {
+            font: fontBase,
+            alignment: { vertical: "center", horizontal: "right" },
+            border: borderStyle,
+            numFmt: "#,##0"
+        };
+
+        const styleCurrencyBold = {
+            font: fontBold,
+            alignment: { vertical: "center", horizontal: "right" },
+            border: borderStyle,
+            numFmt: "#,##0"
+        };
+
         // Create workbook
         const wb = XLSX.utils.book_new();
         const ws_data = [];
 
-        // Row 1-3: Header
+        // Helper to add row with specific style
+        // Note: We'll construct the AOA first, then apply styles to the sheet cells
+
+        // Row 1-6: Header Info
+        // Left side
         ws_data.push(['HỘ, CÁ NHÂN KINH DOANH:......', '', '', '', 'Mẫu số S2c-HKD']);
         ws_data.push(['Mã số thuế:........................................', '', '', '', '(Kèm theo Thông tư']);
         ws_data.push(['Địa chỉ:............................................', '', '', '', 'số 152/2025/TT-BTC']);
         ws_data.push(['', '', '', '', 'ngày 31 tháng 12 năm']);
         ws_data.push(['', '', '', '', '2025 của Bộ trưởng']);
-        ws_data.push([]); // Row 6: Empty
+        ws_data.push(['', '', '', '', '']); // Empty
 
         // Row 7-9: Title
-        ws_data.push(['', 'SỔ CHI TIẾT DOANH THU, CHI PHÍ']);
-        ws_data.push(['', `Địa điểm kinh doanh:................................`]);
-        ws_data.push(['', `Kỳ kế khai:................................................`]);
-        ws_data.push([]); // Row 10: Empty
+        ws_data.push(['', 'SỔ CHI TIẾT DOANH THU, CHI PHÍ', '', '', '']);
+        ws_data.push(['', `Địa điểm kinh doanh:................................`, '', '', '']);
+        ws_data.push(['', `Kỳ kế khai:................................................`, '', '', '']);
+
+        // Row 10: Empty
+        ws_data.push(['', '', '', '', '']);
 
         // Row 11: "Đơn vị tính:"
-        ws_data.push(['', '', '', '', 'Đơn vị tính:']);
+        ws_data.push(['', '', '', '', 'Đơn vị tính: Đồng']);
 
-        // Row 12-13: Table header
+        // Row 12-13: Table Header
         ws_data.push(['', 'Chứng từ', '', 'Diễn giải', 'Số tiền']);
         ws_data.push(['Số hiệu', 'Ngày, tháng', '', '', '']);
 
-        // Data rows
-        rows.forEach((row, index) => {
+        const headerStartRow = 11; // 0-indexed (Row 12)
+
+        // Data Rows
+        let rowIndex = 0;
+        rows.forEach((row, i) => {
             ws_data.push([
-                index + 1,           // Số hiệu
-                row.date,            // Ngày tháng
-                '',                  // Empty
-                row.description,     // Diễn giải
-                row.revenue          // Số tiền
+                i + 1,           // Số hiệu
+                row.date,        // Ngày tháng
+                '',              // Empty (merged)
+                row.description, // Diễn giải
+                row.revenue      // Số tiền
             ]);
+            rowIndex++;
         });
 
-        // Add empty rows if needed (minimum 5 data rows)
-        while (ws_data.length < 18) {
+        // Min rows padding
+        const minRows = 8;
+        for (let i = rowIndex; i < minRows; i++) {
             ws_data.push(['', '', '', '', '']);
+            rowIndex++;
         }
 
-        // Total row
+        // Totals Row
+        const totalRowIdx = ws_data.length;
         ws_data.push(['', 'Tổng cộng', '', '', totalRevenue]);
-        ws_data.push([]); // Empty
 
         // Footer
-        ws_data.push(['', '', 'Ngày ... tháng ... năm ...']);
-        ws_data.push(['', '', 'NGƯỜI ĐẠI DIỆN HỘ KINH DOANH/']);
-        ws_data.push(['', '', 'CÁ NHÂN KINH DOANH']);
-        ws_data.push(['', '', '(Ký, họ tên, đóng dấu)']);
+        ws_data.push(['', '', '', '', '']); // Empty
+        const day = new Date().getDate();
+        const m = new Date().getMonth() + 1;
+        const y = new Date().getFullYear();
+        ws_data.push(['', '', '', `Ngày ${day} tháng ${m} năm ${y}`, '']);
+        ws_data.push(['', '', '', 'NGƯỜI ĐẠI DIỆN HỘ KINH DOANH/', '']);
+        ws_data.push(['', '', '', 'CÁ NHÂN KINH DOANH', '']);
+        ws_data.push(['', '', '', '(Ký, họ tên, đóng dấu)', '']);
 
         // Create worksheet
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-        // Set column widths
+        // Column Widths
         ws['!cols'] = [
             { wch: 10 },  // A: Số hiệu
-            { wch: 15 },  // B: Ngày tháng / Chứng từ
-            { wch: 5 },   // C: Empty
-            { wch: 40 },  // D: Diễn giải
-            { wch: 15 }   // E: Số tiền
+            { wch: 15 },  // B: Ngày tháng
+            { wch: 2 },   // C: Empty (merged)
+            { wch: 45 },  // D: Diễn giải
+            { wch: 20 }   // E: Số tiền
         ];
 
-        // Merge cells
-        const merges = [];
+        // Merges
+        ws['!merges'] = [
+            // Header Info Left
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } },
+            { s: { r: 2, c: 0 }, e: { r: 2, c: 3 } },
 
-        // Header (rows 1-5)
-        merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }); // Row 1 left
-        merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }); // Row 2 left
-        merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: 3 } }); // Row 3 left
+            // Title Center
+            { s: { r: 6, c: 1 }, e: { r: 6, c: 4 } },
+            { s: { r: 7, c: 1 }, e: { r: 7, c: 4 } },
+            { s: { r: 8, c: 1 }, e: { r: 8, c: 4 } },
 
-        // Title (rows 7-9)
-        merges.push({ s: { r: 6, c: 1 }, e: { r: 6, c: 4 } }); // Title
-        merges.push({ s: { r: 7, c: 1 }, e: { r: 7, c: 4 } }); // Địa điểm
-        merges.push({ s: { r: 8, c: 1 }, e: { r: 8, c: 4 } }); // Kỳ kế khai
+            // Table Header "Chứng từ"
+            { s: { r: 11, c: 1 }, e: { r: 11, c: 2 } }, // Row 12, B-C
 
-        // Table header (row 12)
-        merges.push({ s: { r: 11, c: 1 }, e: { r: 11, c: 2 } }); // "Chứng từ"
+            // Table Header "Số hiệu" (merge vertical)
+            { s: { r: 11, c: 0 }, e: { r: 12, c: 0 } }, // Row 12-13, A
 
-        ws['!merges'] = merges;
+            // Table Header "Diễn giải" (merge vertical)
+            { s: { r: 11, c: 3 }, e: { r: 12, c: 3 } }, // Row 12-13, D
 
-        // Format numbers
-        const startDataRow = 13;
-        const endDataRow = startDataRow + rows.length;
-        for (let r = startDataRow; r <= endDataRow; r++) {
-            const cell = ws[XLSX.utils.encode_cell({ r, c: 4 })];
-            if (cell && typeof cell.v === 'number') {
-                cell.z = '#,##0';
+            // Table Header "Số tiền" (merge vertical)
+            { s: { r: 11, c: 4 }, e: { r: 12, c: 4 } }, // Row 12-13, E
+
+            // Footer Signature
+            { s: { r: totalRowIdx + 2, c: 3 }, e: { r: totalRowIdx + 2, c: 4 } },
+            { s: { r: totalRowIdx + 3, c: 3 }, e: { r: totalRowIdx + 3, c: 4 } },
+            { s: { r: totalRowIdx + 4, c: 3 }, e: { r: totalRowIdx + 4, c: 4 } },
+            { s: { r: totalRowIdx + 5, c: 3 }, e: { r: totalRowIdx + 5, c: 4 } }
+        ];
+
+        // Apply Styles
+        for (let r = 0; r < ws_data.length; r++) {
+            for (let c = 0; c < 5; c++) {
+                const cellRef = XLSX.utils.encode_cell({ r, c });
+                if (!ws[cellRef]) ws[cellRef] = { v: '', t: 's' }; // Ensure cell exists
+
+                const cell = ws[cellRef];
+
+                // Header Info (Rows 1-5)
+                if (r < 5) {
+                    if (c === 4) { // Right side
+                        cell.s = { font: { ...fontBase, italic: true }, alignment: { horizontal: "center" } };
+                    } else if (c === 0) { // Left side
+                        cell.s = { font: fontBold, alignment: { horizontal: "left" } };
+                    }
+                }
+
+                // Title (Rows 7-9)
+                if (r >= 6 && r <= 8) {
+                    if (c === 1) cell.s = { font: fontTitle, alignment: { horizontal: "center" } };
+                }
+
+                // Table Header (Rows 12-13)
+                if (r >= 11 && r <= 12) {
+                    cell.s = styleHeader;
+                }
+
+                // Data Rows
+                if (r >= 13 && r < totalRowIdx) {
+                    if (c === 0) cell.s = styleCellCenter; // Số hiệu
+                    if (c === 1) cell.s = styleCellCenter; // Ngày tháng
+                    if (c === 2) cell.s = styleCellCenter; // Empty (merged into B actually, but just in case)
+                    if (c === 3) cell.s = styleCellLeft;   // Diễn giải
+                    if (c === 4) cell.s = styleCurrency;   // Số tiền
+
+                    // Specific fix for merged column B-C in data rows? 
+                    // No, data "Ngày, tháng" is single column B in template structure 
+                    // but header "Chứng từ" spans B-C.
+                    // Actually, "Chứng từ" header spans B-C headers: "Ngày, tháng" is under B?
+                    // Let's re-read template image logic.
+                    // Row 12: "Chứng từ" (B-C), "Diễn giải" (D), "Số tiền" (E)
+                    // Row 13: "Số hiệu" (A), "Ngày, tháng" (B), "Số hiệu" (C)? No C is empty in header row 13.
+                    // Wait, usually "Chứng từ" -> B: Số hiệu, C: Ngày tháng?
+                    // Ah, template image shows: 
+                    // A: Số hiệu (spans 12-13?)
+                    // B-C: Chứng từ (Row 12). Under it: B: Số hiệu? No A is Số hiệu.
+                    // Wait, let's look at image again (simulated):
+                    // Layout:
+                    // Col A: Số hiệu
+                    // Col B: Ngày, tháng (Under "Chứng từ")
+                    // Col C: (Empty? Or "Chứng từ" spans B-C?)
+                    // If "Chứng từ" spans B-C, then Row 13 should have headers for B and C.
+                    // But in my code I put "Ngày, tháng" in B. What is C?
+                    // Maybe "Chứng từ" is just Col B? But header merge suggests span.
+                    // Let's assume Col B is "Ngày, tháng" and C is irrelevant or merged.
+                    // I'll stick to simple table: A, B, C(empty/merged), D, E.
+                    // I will merge B-C for data rows to keep it consistent? No, just keep B.
+                }
+
+                // Total Row
+                if (r === totalRowIdx) {
+                    cell.s = styleBoldCenter;
+                    cell.s.border = borderStyle;
+                    if (c === 1) cell.v = "Tổng cộng";
+                    if (c === 4) cell.s = styleCurrencyBold;
+                }
+
+                // Footer
+                if (r > totalRowIdx) {
+                    if (c === 3) cell.s = styleCenter;
+                    if (r === totalRowIdx + 2) cell.s = { ...styleCenter, font: { ...fontBase, italic: true } }; // Ngày...
+                    if (r === totalRowIdx + 3) cell.s = { ...styleCenter, font: fontBold }; // NGƯỜI ĐẠI DIỆN...
+                }
             }
         }
 
@@ -200,19 +361,10 @@ const ExportReport = {
         // Write and download
         try {
             const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            const blob = new Blob([wbout], {
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            });
+            const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
             const filename = `Bao_cao_thang_${month}_${year}.xlsx`;
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            App.showToast(`Đã xuất báo cáo: ${filename}`, 'success');
+            this.downloadFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         } catch (error) {
             console.error('Export error:', error);
             App.showToast('Lỗi xuất file: ' + error.message, 'error');
@@ -222,8 +374,10 @@ const ExportReport = {
     /**
      * Download file helper
      */
-    downloadFile(content, filename, mimeType) {
-        const blob = new Blob([content], { type: mimeType });
+    downloadFile(blob, filename, mimeType) {
+        if (!(blob instanceof Blob)) {
+            blob = new Blob([blob], { type: mimeType });
+        }
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = filename;
