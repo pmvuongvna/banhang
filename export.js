@@ -14,42 +14,43 @@ const ExportReport = {
     },
 
     /**
-     * Helper: Parse date safely handling multiple formats
+     * Helper: Parse Vietnamese datetime string to Date object
+     * Format: "4/2/2026, 10:30:00" or "4/2/2026"
      */
-    parseDateSafe(str) {
-        if (!str) return null;
+    parseDateSafe(datetimeStr) {
+        if (!datetimeStr) return null;
+
         try {
-            // Remove time part (split by comma or space if time follows)
-            // Expect formats: "d/m/y", "d/m/y, time", "d-m-y", "y-m-d"
-            let datePart = str.split(',')[0].trim();
-            // If space exists, might be "d/m/y HH:mm"
-            if (datePart.includes(' ') && datePart.includes(':')) {
-                datePart = datePart.split(' ')[0].trim();
+            // Handle various separators
+            let datePart = datetimeStr;
+
+            // If contains comma (e.g. "4/2/2026, 10:30:00")
+            if (datetimeStr.includes(',')) {
+                datePart = datetimeStr.split(',')[0].trim();
+            }
+            // If starts with time (rare but possible: "10:30:00 4/2/2026")
+            else if (datetimeStr.includes(':') && datetimeStr.includes(' ')) {
+                const parts = datetimeStr.split(' ');
+                // Assume the part with slashes is the date
+                datePart = parts.find(p => p.includes('/')) || parts[0];
             }
 
-            // Split by / or -
-            const parts = datePart.split(/[\/\-]/);
-
+            // Parse date (d/m/yyyy)
+            const parts = datePart.split('/');
             if (parts.length === 3) {
-                const p0 = parseInt(parts[0]);
-                const p1 = parseInt(parts[1]);
-                const p2 = parseInt(parts[2]);
+                const day = parseInt(parts[0]);
+                const month = parseInt(parts[1]) - 1; // 0-indexed
+                const year = parseInt(parts[2]);
 
-                // Detect YYYY-MM-DD vs DD-MM-YYYY
-                if (p0 > 1000) {
-                    // YYYY-MM-DD
-                    return new Date(p0, p1 - 1, p2);
-                } else {
-                    // DD-MM-YYYY
-                    return new Date(p2, p1 - 1, p0);
-                }
+                const date = new Date(year, month, day);
+                return isNaN(date.getTime()) ? null : date;
             }
 
-            // Fallback to standard Date parse
-            const d = new Date(str);
+            // Fallback for YYYY-MM-DD or other formats
+            const d = new Date(datetimeStr);
             return isNaN(d.getTime()) ? null : d;
-        } catch (e) {
-            console.warn('Date parse error:', str, e);
+        } catch (error) {
+            console.warn('Date parse error:', datetimeStr, error);
             return null;
         }
     },
