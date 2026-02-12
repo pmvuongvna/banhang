@@ -33,7 +33,12 @@ const Transactions = {
                     (row[2] && (row[2].toLowerCase() === 'chi' || row[2] === 'Chi')) ? 'expense' :
                         row[2] || '',
                 description: row[3] || '',
-                amount: parseFloat(row[4]) || 0,
+                // Handle Vietnamese currency format (e.g., "280.000" or "280,000")
+                // remove dots (thousands sep) and replace comma with dot (decimal) if any
+                // BUT typically in VN: 1.000.000 = 1 million. 
+                amount: typeof row[4] === 'string' ?
+                    parseFloat(row[4].replace(/\./g, '').replace(/,/g, '.')) || 0 :
+                    parseFloat(row[4]) || 0,
                 note: row[5] || '',
                 sheetName: sheetName // Store sheet name
             }));

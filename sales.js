@@ -356,7 +356,10 @@ const Sales = {
         // Group by Date (dd/mm/yyyy)
         const groups = {};
         filtered.forEach(s => {
-            const dateStr = s.datetime.split(',')[0].trim(); // Extract date part
+            // Extract date part using Regex to handle "HH:mm:ss dd/MM/yyyy" or "dd/MM/yyyy"
+            const match = s.datetime.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+            const dateStr = match ? match[1] : s.datetime.split(',')[0].trim();
+
             if (!groups[dateStr]) groups[dateStr] = [];
             groups[dateStr].push(s);
         });
