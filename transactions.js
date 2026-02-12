@@ -29,8 +29,8 @@ const Transactions = {
                 rowIndex: index + 2,
                 id: row[0] || '',
                 date: row[1] || '',
-                type: (row[2] && (row[2].toLowerCase() === 'thu' || row[2] === 'Thu')) ? 'income' :
-                    (row[2] && (row[2].toLowerCase() === 'chi' || row[2] === 'Chi')) ? 'expense' :
+                type: (row[2] && (row[2].trim().toLowerCase() === 'thu' || row[2].trim() === 'Thu')) ? 'income' :
+                    (row[2] && (row[2].trim().toLowerCase() === 'chi' || row[2].trim() === 'Chi')) ? 'expense' :
                         row[2] || '',
                 description: row[3] || '',
                 // Handle Vietnamese currency format (e.g., "280.000" or "280,000")
@@ -129,21 +129,22 @@ const Transactions = {
 
         const balance = income - expense;
 
-        document.getElementById('stat-income').textContent = Products.formatCurrency(income);
-        document.getElementById('stat-expense').textContent = Products.formatCurrency(expense);
-        document.getElementById('stat-balance').textContent = Products.formatCurrency(balance);
+        document.getElementById('total-income').textContent = Products.formatCurrency(income);
+        document.getElementById('total-expense').textContent = Products.formatCurrency(expense);
+        document.getElementById('total-balance').textContent = Products.formatCurrency(balance);
 
         // Also update dashboard chart if needed, but App.js handles that via DashboardChart.updateChart
     },
 
     /**
-     * Helper: Parse date string dd/mm/yyyy
+     * Helper: Parse date string dd/mm/yyyy (ignoring time if present)
      */
     parseDate(str) {
         if (!str) return new Date(0);
-        const parts = str.split('/');
-        if (parts.length === 3) {
-            return new Date(parts[2], parts[1] - 1, parts[0]);
+        // Match dd/mm/yyyy
+        const match = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (match) {
+            return new Date(match[3], match[2] - 1, match[1]);
         }
         return new Date(0);
     },

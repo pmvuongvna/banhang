@@ -962,10 +962,15 @@ body {
     border-radius: var(--border-radius-sm);
     background: var(--bg-tertiary);
     margin-bottom: 8px;
+    justify-content: space-between;
+    /* Ensure separation */
 }
 
 .cart-item-info {
     flex: 1;
+    min-width: 0;
+    /* Allow truncation */
+    margin-right: 8px;
 }
 
 .cart-item-name {
@@ -985,7 +990,8 @@ body {
 }
 
 .price-input {
-    width: 100px;
+    width: 100%;
+    max-width: 90px;
     padding: 4px 8px;
     font-size: 0.85rem;
     font-family: inherit;
@@ -1015,11 +1021,17 @@ body {
     text-decoration: line-through;
 }
 
+.cart-item-actions {
+    display: flex;
+    align-items: center;
+}
+
 .cart-item-qty {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 0 12px;
+    gap: 4px;
+    margin: 0;
+    flex-shrink: 0;
 }
 
 .cart-item-qty button {

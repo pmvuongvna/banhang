@@ -163,9 +163,11 @@ const Sales = {
                         </div>
                     </div>
                     <div class="cart-item-actions">
-                        <button class="btn-qty" onclick="Sales.updateQuantity(${index}, -1)">-</button>
-                        <span>${item.quantity}</span>
-                        <button class="btn-qty" onclick="Sales.updateQuantity(${index}, 1)">+</button>
+                        <div class="cart-item-qty">
+                            <button class="btn-qty" onclick="Sales.updateQuantity(${index}, -1)">-</button>
+                            <span>${item.quantity}</span>
+                            <button class="btn-qty" onclick="Sales.updateQuantity(${index}, 1)">+</button>
+                        </div>
                         <button class="btn-remove" onclick="Sales.removeFromCart(${index})">×</button>
                     </div>
                 </div>
