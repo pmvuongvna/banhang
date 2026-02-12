@@ -800,6 +800,58 @@ body {
     margin-bottom: 16px;
 }
 
+/* Status Classes */
+.text-success {
+    color: var(--accent-success);
+}
+
+.text-danger {
+    color: var(--accent-danger);
+}
+
+.text-warning {
+    color: var(--accent-warning);
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    /* var(--border-radius-sm) is 8px, maybe too big for badge? Let's use 4px or var */
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-success {
+    background-color: var(--accent-success-light);
+    color: var(--accent-success);
+}
+
+.badge-danger {
+    background-color: var(--accent-danger-light);
+    color: var(--accent-danger);
+}
+
+.badge-warning {
+    background-color: var(--accent-warning-light);
+    color: var(--accent-warning);
+}
+
+/* Dark mode adjustments for badges */
+[data-theme="dark"] .badge-success {
+    background-color: rgba(16, 185, 129, 0.2);
+}
+
+[data-theme="dark"] .badge-danger {
+    background-color: rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="dark"] .badge-warning {
+    background-color: rgba(245, 158, 11, 0.2);
+}
+
+
 .sales-history .tab-header h3 {
     font-size: 1rem;
     font-weight: 600;

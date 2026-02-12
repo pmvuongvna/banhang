@@ -29,7 +29,9 @@ const Transactions = {
                 rowIndex: index + 2,
                 id: row[0] || '',
                 date: row[1] || '',
-                type: row[2] || '',
+                type: (row[2] && (row[2].toLowerCase() === 'thu' || row[2] === 'Thu')) ? 'income' :
+                    (row[2] && (row[2].toLowerCase() === 'chi' || row[2] === 'Chi')) ? 'expense' :
+                        row[2] || '',
                 description: row[3] || '',
                 amount: parseFloat(row[4]) || 0,
                 note: row[5] || '',

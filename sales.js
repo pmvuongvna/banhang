@@ -35,6 +35,7 @@ const Sales = {
                 sheetName: sheetName // Store sheet name for updates
             }));
             this.updateDashboardStats();
+            this.renderSalesHistory();
             return this.sales;
         } catch (error) {
             console.error('Error loading sales:', error);
