@@ -428,7 +428,9 @@ const SheetsAPI = {
 
             // Check if it has the required sheets
             const sheets = response.result.sheets.map(s => s.properties.title);
-            const requiredSheets = [CONFIG.SHEETS.PRODUCTS, CONFIG.SHEETS.SALES, CONFIG.SHEETS.TRANSACTIONS];
+            // Relaxed check: Only Products and Settings are strictly required initially
+            // Sales and Transactions can be created dynamically
+            const requiredSheets = [CONFIG.SHEETS.PRODUCTS, CONFIG.SHEETS.SETTINGS];
             const missingSheets = requiredSheets.filter(s => !sheets.includes(s));
 
             if (missingSheets.length > 0) {
@@ -451,6 +453,82 @@ const SheetsAPI = {
             } else if (error.status === 403) {
                 throw new Error('Bạn không có quyền truy cập Sheet này.');
             }
+            throw error;
+        }
+    },
+
+    /**
+     * Get sheet name with month suffix (e.g. Sales_02_2026)
+     */
+    getMonthSheetName(baseName, date = new Date()) {
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${baseName}_${month}_${year}`;
+    },
+
+    /**
+     * Check if a sheet exists, if not create it with headers
+     */
+    async ensureSheetExists(sheetName, headers) {
+        const sheetIds = await this.getSheetIds();
+        if (sheetIds[sheetName]) return true;
+
+        try {
+            // Create new sheet
+            await gapi.client.sheets.spreadsheets.batchUpdate({
+                spreadsheetId: this.spreadsheetId,
+                resource: {
+                    requests: [{
+                        addSheet: {
+                            properties: {
+                                title: sheetName,
+                                gridProperties: { frozenRowCount: 1 }
+                            }
+                        }
+                    }]
+                }
+            });
+
+            // Add headers
+            await gapi.client.sheets.spreadsheets.values.update({
+                spreadsheetId: this.spreadsheetId,
+                range: `${sheetName}!A1`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [headers] }
+            });
+
+            // Format headers
+            const newSheetIds = await this.getSheetIds();
+            const newSheetId = newSheetIds[sheetName];
+
+            await gapi.client.sheets.spreadsheets.batchUpdate({
+                spreadsheetId: this.spreadsheetId,
+                resource: {
+                    requests: [{
+                        repeatCell: {
+                            range: {
+                                sheetId: newSheetId,
+                                startRowIndex: 0,
+                                endRowIndex: 1
+                            },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.2, green: 0.2, blue: 0.3 },
+                                    textFormat: {
+                                        bold: true,
+                                        foregroundColor: { red: 1, green: 1, blue: 1 }
+                                    }
+                                }
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat)'
+                        }
+                    }]
+                }
+            });
+
+            return true;
+        } catch (error) {
+            console.error(`Error creating sheet ${sheetName}:`, error);
             throw error;
         }
     }

@@ -143,11 +143,18 @@ const App = {
     /**
      * Load all data from sheets
      */
-    async loadAllData() {
+    async loadAllData(date = new Date()) {
+        const monthSelector = document.getElementById('month-selector');
+        // Set selector value if not set (format YYYY-MM)
+        const monthStr = date.toISOString().slice(0, 7);
+        if (monthSelector.value !== monthStr) {
+            monthSelector.value = monthStr;
+        }
+
         await Promise.all([
-            Products.loadProducts(),
-            Sales.loadSales(),
-            Transactions.loadTransactions()
+            Products.loadProducts(), // Products are global, not monthly
+            Sales.loadSales(date),
+            Transactions.loadTransactions(date)
         ]);
         Reports.updateReports('month');
 
@@ -162,7 +169,8 @@ const App = {
     async syncData() {
         this.showLoading(true);
         try {
-            await this.loadAllData();
+            const date = new Date(document.getElementById('month-selector').value + '-01');
+            await this.loadAllData(date);
             this.showToast('Đã đồng bộ dữ liệu');
         } catch (error) {
             this.showToast('Lỗi đồng bộ', 'error');
@@ -294,6 +302,18 @@ const App = {
         // Theme toggle
         document.getElementById('btn-theme').addEventListener('click', () => {
             this.toggleTheme();
+        });
+
+        // Month selector
+        const monthSelector = document.getElementById('month-selector');
+        // Set default to current month
+        monthSelector.value = new Date().toISOString().slice(0, 7);
+
+        monthSelector.addEventListener('change', (e) => {
+            if (e.target.value) {
+                const date = new Date(e.target.value + '-01');
+                this.loadAllData(date);
+            }
         });
 
         // Sync button

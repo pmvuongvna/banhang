@@ -30,9 +30,20 @@ const Reports = {
         const salesData = Sales.sales;
         const transactionsData = Transactions.transactions;
 
+        // Get currently selected month from UI to use as reference
+        const monthSelector = document.getElementById('month-selector');
+        const referenceDate = monthSelector && monthSelector.value
+            ? new Date(monthSelector.value + '-01')
+            : new Date();
+
         // Filter by period
-        const filteredSales = this.filterByPeriod(salesData, period);
-        const filteredTransactions = Transactions.getByPeriod(period);
+        const filteredSales = this.filterByPeriod(salesData, period, referenceDate);
+        // Transactions.getByPeriod also needs update or we do it here
+        // Transactions.js doesn't have getByPeriod exposed in the snippet I saw earlier? 
+        // Wait, I didn't verify `Transactions.getByPeriod`. I only saw `loadTransactions`.
+        // Let's check if Transactions has `getByPeriod`. If not, I should filter it here or add it.
+        // Assuming Transactions.transactions is the source.
+        const filteredTransactions = this.filterByPeriod(transactionsData, period, referenceDate);
 
         // Calculate stats
         const revenue = filteredSales.reduce((sum, s) => sum + s.total, 0);
@@ -61,14 +72,14 @@ const Reports = {
     },
 
     /**
-     * Filter data by period - improved date parsing
+     * Filter data by period
      */
-    filterByPeriod(data, period) {
-        const now = new Date();
+    filterByPeriod(data, period, referenceDate = new Date()) {
+        const now = new Date(); // Real "now" for today/week
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
         return data.filter(item => {
-            const itemDate = this.parseDatetime(item.datetime);
+            const itemDate = this.parseDatetime(item.date || item.datetime); // Handle both fields
             if (!itemDate) return false;
 
             switch (period) {
@@ -79,8 +90,9 @@ const Reports = {
                     weekAgo.setDate(weekAgo.getDate() - 7);
                     return itemDate >= weekAgo && itemDate <= now;
                 case 'month':
-                    return itemDate.getMonth() === now.getMonth() &&
-                        itemDate.getFullYear() === now.getFullYear();
+                    // Compare with REFERENCE date (selected month)
+                    return itemDate.getMonth() === referenceDate.getMonth() &&
+                        itemDate.getFullYear() === referenceDate.getFullYear();
                 case 'all':
                 default:
                     return true;

@@ -111,31 +111,43 @@ const DashboardChart = {
         const incomeData = [];
         const expenseData = [];
 
+        // Get currently selected month from UI to use as reference
+        const monthSelector = document.getElementById('month-selector');
+        const referenceDate = monthSelector && monthSelector.value
+            ? new Date(monthSelector.value + '-01')
+            : new Date();
+
         if (period === 'week') {
-            // Last 7 days
+            // Last 7 days (Real Time)
+            const now = new Date();
             for (let i = 6; i >= 0; i--) {
                 const date = new Date();
-                date.setDate(date.getDate() - i);
+                date.setDate(now.getDate() - i);
                 const dateStr = date.toLocaleDateString('vi-VN');
                 const dayName = date.toLocaleDateString('vi-VN', { weekday: 'short' });
 
-                labels.push(dayName + ' ' + date.getDate());
+                labels.push(dayName + ' ' + date.getDate()); // e.g. "Mon 12"
 
                 const dayTransactions = transactions.filter(t => t.date === dateStr);
                 incomeData.push(dayTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0));
                 expenseData.push(dayTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0));
             }
         } else if (period === 'month') {
-            // Current month by week or by day (last 15 days)
-            const now = new Date();
-            const daysToShow = Math.min(now.getDate(), 15);
+            // Show all days of selected month
+            const year = referenceDate.getFullYear();
+            const month = referenceDate.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-            for (let i = daysToShow - 1; i >= 0; i--) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                const dateStr = date.toLocaleDateString('vi-VN');
+            for (let day = 1; day <= daysInMonth; day++) {
+                // Be careful constructing date for matching Transactions dateStr
+                // Transactions store date as locale date string (d/m/yyyy usually or dd/mm/yyyy depending on locale)
+                // App logic stores it as `vi-VN` locale string implicitly via `Date.toLocaleDateString('vi-VN')`
+                // Let's match how transactions are stored.
 
-                labels.push(date.getDate() + '/' + (date.getMonth() + 1));
+                const date = new Date(year, month, day);
+                const dateStr = date.toLocaleDateString('vi-VN'); // Should match storage format
+
+                labels.push(day);
 
                 const dayTransactions = transactions.filter(t => t.date === dateStr);
                 incomeData.push(dayTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0));
