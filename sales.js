@@ -66,13 +66,12 @@ const Sales = {
         }
 
         container.innerHTML = filtered.map(p => `
-            <div class="search-item" onclick="Sales.addToCart('${p.code}')">
-                <div class="item-name">${Products.escapeHtml(p.name)}</div>
-                <div class="item-meta">
-                    <span class="item-code">${p.code}</span>
-                    <span class="item-price">${Products.formatCurrency(p.price)}</span>
-                    <span class="item-stock">Kho: ${p.stock}</span>
+            <div class="search-result-item" onclick="Sales.addToCart('${p.code}')">
+                <div class="product-info">
+                    <div class="product-name">${Products.escapeHtml(p.name)}</div>
+                    <div class="product-code">${p.code} <span class="divider">•</span> Kho: ${p.stock}</div>
                 </div>
+                <div class="product-price">${Products.formatCurrency(p.price)}</div>
             </div>
         `).join('');
         container.style.display = 'block';
