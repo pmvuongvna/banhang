@@ -44,7 +44,138 @@ const Transactions = {
         }
     },
 
-    // ... (filterTransactions, renderTransactions, updateSummary, showAddModal, editTransaction unchanged) ...
+    /**
+     * Filter transactions
+     */
+    filterTransactions(type) {
+        this.currentFilter = type;
+
+        // Update active filter button
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === type);
+        });
+
+        this.renderTransactions();
+    },
+
+    /**
+     * Render transactions list
+     */
+    renderTransactions() {
+        const container = document.getElementById('transactions-tbody');
+        if (!container) return;
+
+        let filtered = this.transactions;
+        if (this.currentFilter !== 'all') {
+            filtered = this.transactions.filter(t => t.type === this.currentFilter);
+        }
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<tr><td colspan="6" class="empty-state">Không có giao dịch</td></tr>';
+            return;
+        }
+
+        // Sort by date desc (if date is string dd/mm/yyyy, need parsing)
+        filtered.sort((a, b) => {
+            const dateA = this.parseDate(a.date);
+            const dateB = this.parseDate(b.date);
+            return dateB - dateA;
+        });
+
+        container.innerHTML = filtered.map(t => {
+            const isIncome = t.type === 'income';
+            return `
+                <tr class="transaction-row ${t.type}">
+                    <td>${t.date}</td>
+                    <td>
+                        <span class="badge ${isIncome ? 'badge-success' : 'badge-danger'}">
+                            ${isIncome ? 'Thu' : 'Chi'}
+                        </span>
+                    </td>
+                    <td>${Products.escapeHtml(t.description)}</td>
+                    <td class="amount ${isIncome ? 'text-success' : 'text-danger'}">
+                        ${isIncome ? '+' : '-'}${Products.formatCurrency(t.amount)}
+                    </td>
+                    <td>${Products.escapeHtml(t.note)}</td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="action-btn edit" onclick="Transactions.editTransaction(${t.rowIndex})" title="Sửa">✏️</button>
+                            <button class="action-btn delete" onclick="Transactions.deleteTransaction('${t.id}')" title="Xóa">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    /**
+     * Update summary stats (income/expense/balance)
+     */
+    updateSummary() {
+        const income = this.transactions
+            .filter(t => t.type === 'income')
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        const expense = this.transactions
+            .filter(t => t.type === 'expense')
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        const balance = income - expense;
+
+        document.getElementById('stat-income').textContent = Products.formatCurrency(income);
+        document.getElementById('stat-expense').textContent = Products.formatCurrency(expense);
+        document.getElementById('stat-balance').textContent = Products.formatCurrency(balance);
+
+        // Also update dashboard chart if needed, but App.js handles that via DashboardChart.updateChart
+    },
+
+    /**
+     * Helper: Parse date string dd/mm/yyyy
+     */
+    parseDate(str) {
+        if (!str) return new Date(0);
+        const parts = str.split('/');
+        if (parts.length === 3) {
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+        return new Date(0);
+    },
+
+    /**
+     * Show add transaction modal
+     */
+    showAddModal(type) {
+        document.getElementById('transaction-type').value = type;
+        document.getElementById('transaction-desc').value = '';
+        document.getElementById('transaction-amount').value = '';
+        document.getElementById('transaction-note').value = '';
+
+        // Update modal title logic if needed, or just generic "Thêm giao dịch"
+        // UI might want "Thêm khoản thu" or "Thêm khoản chi" title update
+        const title = type === 'income' ? 'Thêm khoản thu' : 'Thêm khoản chi';
+        document.querySelector('#modal-transaction .modal-header h3').textContent = title;
+
+        this.editingTransactionRow = null;
+        document.getElementById('modal-transaction').classList.add('active');
+    },
+
+    /**
+     * Edit transaction
+     */
+    editTransaction(rowIndex) {
+        const transaction = this.transactions.find(t => t.rowIndex === rowIndex);
+        if (!transaction) return;
+
+        this.editingTransactionRow = rowIndex;
+
+        document.getElementById('transaction-type').value = transaction.type;
+        document.getElementById('transaction-desc').value = transaction.description;
+        document.getElementById('transaction-amount').value = transaction.amount;
+        document.getElementById('transaction-note').value = transaction.note;
+
+        document.querySelector('#modal-transaction .modal-header h3').textContent = 'Sửa giao dịch';
+        document.getElementById('modal-transaction').classList.add('active');
+    },
 
     /**
      * Add transaction programmatically (from Sales)

@@ -326,7 +326,7 @@ const SheetsAPI = {
                 range: `${sheetName}!A:Z`,
                 valueInputOption: 'USER_ENTERED',
                 insertDataOption: 'INSERT_ROWS',
-                resource: { values: [values] }
+                resource: { values: Array.isArray(values[0]) ? values : [values] }
             });
             return response.result;
         } catch (error) {

@@ -25,7 +25,8 @@ const DataMigration = {
             }
         } catch (error) {
             console.error('Migration error:', error);
-            App.showToast('❌ Lỗi chuyển đổi: ' + error.message, 'error');
+            let errorMessage = error.message || (error.result && error.result.error && error.result.error.message) || JSON.stringify(error);
+            App.showToast('❌ Lỗi chuyển đổi: ' + errorMessage, 'error');
         } finally {
             App.showLoading(false);
         }
