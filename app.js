@@ -316,6 +316,11 @@ const App = {
             }
         });
 
+        // Migrate button
+        document.getElementById('btn-migrate')?.addEventListener('click', () => {
+            DataMigration.migrate();
+        });
+
         // Sync button
         document.getElementById('btn-sync').addEventListener('click', () => {
             this.syncData();
