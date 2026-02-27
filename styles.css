@@ -966,6 +966,49 @@ body {
     /* Ensure separation */
 }
 
+/* Tab Header Left - for month nav inline */
+.tab-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tab-month-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.month-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 120px;
+    text-align: center;
+}
+
+.btn-month-nav {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+    padding: 0;
+}
+
+.btn-month-nav:hover {
+    background: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+}
+
 .cart-item-info {
     flex: 1;
     min-width: 0;

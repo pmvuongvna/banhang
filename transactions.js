@@ -7,6 +7,7 @@ const Transactions = {
     transactions: [],
     editingTransactionRow: null,
     currentFilter: 'all',
+    currentViewDate: new Date(),
 
     /**
      * Load all transactions
@@ -354,5 +355,59 @@ const Transactions = {
                 this.filterTransactions(btn.dataset.filter);
             });
         });
+
+        // Initialize month label
+        this.updateMonthLabel();
+    },
+
+    /**
+     * Update the month label display
+     */
+    updateMonthLabel() {
+        const label = document.getElementById('transactions-month-label');
+        if (label) {
+            const m = this.currentViewDate.getMonth() + 1;
+            const y = this.currentViewDate.getFullYear();
+            label.textContent = `Tháng ${String(m).padStart(2, '0')}/${y}`;
+        }
+    },
+
+    /**
+     * Navigate to previous month
+     */
+    async prevMonth() {
+        this.currentViewDate.setMonth(this.currentViewDate.getMonth() - 1);
+        this.updateMonthLabel();
+        // Sync global selector
+        const monthStr = this.currentViewDate.toISOString().slice(0, 7);
+        document.getElementById('month-selector').value = monthStr;
+        App.showLoading(true);
+        try {
+            await this.loadTransactions(this.currentViewDate);
+            // Also reload sales for dashboard consistency
+            await Sales.loadSales(this.currentViewDate);
+            Sales.updateMonthLabel(this.currentViewDate);
+        } finally {
+            App.showLoading(false);
+        }
+    },
+
+    /**
+     * Navigate to next month
+     */
+    async nextMonth() {
+        this.currentViewDate.setMonth(this.currentViewDate.getMonth() + 1);
+        this.updateMonthLabel();
+        // Sync global selector
+        const monthStr = this.currentViewDate.toISOString().slice(0, 7);
+        document.getElementById('month-selector').value = monthStr;
+        App.showLoading(true);
+        try {
+            await this.loadTransactions(this.currentViewDate);
+            await Sales.loadSales(this.currentViewDate);
+            Sales.updateMonthLabel(this.currentViewDate);
+        } finally {
+            App.showLoading(false);
+        }
     }
 };

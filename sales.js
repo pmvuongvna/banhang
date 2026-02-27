@@ -6,6 +6,7 @@
 const Sales = {
     cart: [],
     sales: [],
+    currentViewDate: new Date(),
 
     /**
      * Load sales history
@@ -681,5 +682,61 @@ const Sales = {
         document.getElementById('search-sales')?.addEventListener('input', (e) => {
             this.renderSalesHistory(e.target.value);
         });
+
+        // Initialize month label
+        this.updateMonthLabel();
+    },
+
+    /**
+     * Update the month label display
+     */
+    updateMonthLabel(date) {
+        if (date) this.currentViewDate = new Date(date);
+        const label = document.getElementById('sales-month-label');
+        if (label) {
+            const m = this.currentViewDate.getMonth() + 1;
+            const y = this.currentViewDate.getFullYear();
+            label.textContent = `Tháng ${String(m).padStart(2, '0')}/${y}`;
+        }
+    },
+
+    /**
+     * Navigate to previous month
+     */
+    async prevMonth() {
+        this.currentViewDate.setMonth(this.currentViewDate.getMonth() - 1);
+        this.updateMonthLabel();
+        // Sync global selector
+        const monthStr = this.currentViewDate.toISOString().slice(0, 7);
+        document.getElementById('month-selector').value = monthStr;
+        App.showLoading(true);
+        try {
+            await this.loadSales(this.currentViewDate);
+            await Transactions.loadTransactions(this.currentViewDate);
+            Transactions.currentViewDate = new Date(this.currentViewDate);
+            Transactions.updateMonthLabel();
+        } finally {
+            App.showLoading(false);
+        }
+    },
+
+    /**
+     * Navigate to next month
+     */
+    async nextMonth() {
+        this.currentViewDate.setMonth(this.currentViewDate.getMonth() + 1);
+        this.updateMonthLabel();
+        // Sync global selector
+        const monthStr = this.currentViewDate.toISOString().slice(0, 7);
+        document.getElementById('month-selector').value = monthStr;
+        App.showLoading(true);
+        try {
+            await this.loadSales(this.currentViewDate);
+            await Transactions.loadTransactions(this.currentViewDate);
+            Transactions.currentViewDate = new Date(this.currentViewDate);
+            Transactions.updateMonthLabel();
+        } finally {
+            App.showLoading(false);
+        }
     }
 };

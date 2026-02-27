@@ -313,6 +313,10 @@ const App = {
             if (e.target.value) {
                 const date = new Date(e.target.value + '-01');
                 this.loadAllData(date);
+                // Sync per-tab month labels
+                Sales.updateMonthLabel(date);
+                Transactions.currentViewDate = new Date(date);
+                Transactions.updateMonthLabel();
             }
         });
 

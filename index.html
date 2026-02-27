@@ -267,7 +267,16 @@
                 <!-- Sales History -->
                 <div class="sales-history">
                     <div class="tab-header">
-                        <h3>📋 Lịch sử đơn hàng</h3>
+                        <div class="tab-header-left">
+                            <h3>📋 Lịch sử đơn hàng</h3>
+                            <div class="tab-month-selector">
+                                <button class="btn-icon btn-month-nav" onclick="Sales.prevMonth()"
+                                    title="Tháng trước">◀</button>
+                                <span id="sales-month-label" class="month-label">Tháng 02/2026</span>
+                                <button class="btn-icon btn-month-nav" onclick="Sales.nextMonth()"
+                                    title="Tháng sau">▶</button>
+                            </div>
+                        </div>
                         <button id="btn-add-sale" class="btn btn-outline">+ Thêm đơn cũ</button>
                     </div>
                     <div class="search-bar">
@@ -296,7 +305,16 @@
             <!-- Transactions Tab -->
             <section id="tab-transactions" class="tab-content">
                 <div class="tab-header">
-                    <h2>💰 Quản lý thu chi</h2>
+                    <div class="tab-header-left">
+                        <h2>💰 Quản lý thu chi</h2>
+                        <div class="tab-month-selector">
+                            <button class="btn-icon btn-month-nav" onclick="Transactions.prevMonth()"
+                                title="Tháng trước">◀</button>
+                            <span id="transactions-month-label" class="month-label">Tháng 02/2026</span>
+                            <button class="btn-icon btn-month-nav" onclick="Transactions.nextMonth()"
+                                title="Tháng sau">▶</button>
+                        </div>
+                    </div>
                     <div class="header-actions">
                         <div class="filter-group">
                             <button class="filter-btn active" data-filter="all">Tất cả</button>
