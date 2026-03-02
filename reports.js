@@ -4,6 +4,8 @@
  */
 
 const Reports = {
+    currentViewDate: new Date(),
+
     /**
      * Parse Vietnamese datetime string to Date object
      * Format can be: "12:33:22 4/2/2026" or "4/2/2026, 12:33:22" etc
@@ -24,35 +26,19 @@ const Reports = {
     },
 
     /**
-     * Update reports based on selected period
+     * Update reports — shows stats for the currently loaded month data
      */
-    async updateReports(period = 'month') {
+    async updateReports() {
         const salesData = Sales.sales;
-        const transactionsData = Transactions.transactions;
 
-        // Get currently selected month from UI to use as reference
-        const monthSelector = document.getElementById('month-selector');
-        const referenceDate = monthSelector && monthSelector.value
-            ? new Date(monthSelector.value + '-01')
-            : new Date();
-
-        // Filter by period
-        const filteredSales = this.filterByPeriod(salesData, period, referenceDate);
-        // Transactions.getByPeriod also needs update or we do it here
-        // Transactions.js doesn't have getByPeriod exposed in the snippet I saw earlier? 
-        // Wait, I didn't verify `Transactions.getByPeriod`. I only saw `loadTransactions`.
-        // Let's check if Transactions has `getByPeriod`. If not, I should filter it here or add it.
-        // Assuming Transactions.transactions is the source.
-        const filteredTransactions = this.filterByPeriod(transactionsData, period, referenceDate);
-
-        // Calculate stats
-        const revenue = filteredSales.reduce((sum, s) => sum + s.total, 0);
-        const profit = filteredSales.reduce((sum, s) => sum + s.profit, 0);
-        const orderCount = filteredSales.length;
+        // Calculate stats from loaded data (already filtered by month via loadSales)
+        const revenue = salesData.reduce((sum, s) => sum + s.total, 0);
+        const profit = salesData.reduce((sum, s) => sum + s.profit, 0);
+        const orderCount = salesData.length;
 
         // Count items sold
         let itemsSold = 0;
-        filteredSales.forEach(sale => {
+        salesData.forEach(sale => {
             const matches = sale.details.match(/x(\d+)/g);
             if (matches) {
                 matches.forEach(m => {
@@ -68,36 +54,7 @@ const Reports = {
         document.getElementById('report-items').textContent = itemsSold;
 
         // Update top products
-        this.updateTopProducts(filteredSales);
-    },
-
-    /**
-     * Filter data by period
-     */
-    filterByPeriod(data, period, referenceDate = new Date()) {
-        const now = new Date(); // Real "now" for today/week
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        return data.filter(item => {
-            const itemDate = this.parseDatetime(item.date || item.datetime); // Handle both fields
-            if (!itemDate) return false;
-
-            switch (period) {
-                case 'today':
-                    return itemDate.getTime() === today.getTime();
-                case 'week':
-                    const weekAgo = new Date(today);
-                    weekAgo.setDate(weekAgo.getDate() - 7);
-                    return itemDate >= weekAgo && itemDate <= now;
-                case 'month':
-                    // Compare with REFERENCE date (selected month)
-                    return itemDate.getMonth() === referenceDate.getMonth() &&
-                        itemDate.getFullYear() === referenceDate.getFullYear();
-                case 'all':
-                default:
-                    return true;
-            }
-        });
+        this.updateTopProducts(salesData);
     },
 
     /**
@@ -150,12 +107,67 @@ const Reports = {
     },
 
     /**
+     * Update the month label display
+     */
+    updateMonthLabel(date) {
+        if (date) this.currentViewDate = new Date(date);
+        const label = document.getElementById('reports-month-label');
+        if (label) {
+            const m = this.currentViewDate.getMonth() + 1;
+            const y = this.currentViewDate.getFullYear();
+            label.textContent = `Tháng ${String(m).padStart(2, '0')}/${y}`;
+        }
+    },
+
+    /**
+     * Navigate to previous month
+     */
+    async prevMonth() {
+        this.currentViewDate.setMonth(this.currentViewDate.getMonth() - 1);
+        this.updateMonthLabel();
+        // Sync global selector
+        const monthStr = this.currentViewDate.toISOString().slice(0, 7);
+        document.getElementById('month-selector').value = monthStr;
+        App.showLoading(true);
+        try {
+            await Sales.loadSales(this.currentViewDate);
+            await Transactions.loadTransactions(this.currentViewDate);
+            Sales.updateMonthLabel(this.currentViewDate);
+            Transactions.currentViewDate = new Date(this.currentViewDate);
+            Transactions.updateMonthLabel();
+            this.updateReports();
+        } finally {
+            App.showLoading(false);
+        }
+    },
+
+    /**
+     * Navigate to next month
+     */
+    async nextMonth() {
+        this.currentViewDate.setMonth(this.currentViewDate.getMonth() + 1);
+        this.updateMonthLabel();
+        // Sync global selector
+        const monthStr = this.currentViewDate.toISOString().slice(0, 7);
+        document.getElementById('month-selector').value = monthStr;
+        App.showLoading(true);
+        try {
+            await Sales.loadSales(this.currentViewDate);
+            await Transactions.loadTransactions(this.currentViewDate);
+            Sales.updateMonthLabel(this.currentViewDate);
+            Transactions.currentViewDate = new Date(this.currentViewDate);
+            Transactions.updateMonthLabel();
+            this.updateReports();
+        } finally {
+            App.showLoading(false);
+        }
+    },
+
+    /**
      * Initialize event listeners
      */
     init() {
-        // Period selector
-        document.getElementById('report-period').addEventListener('change', (e) => {
-            this.updateReports(e.target.value);
-        });
+        // Initialize month label
+        this.updateMonthLabel();
     }
 };

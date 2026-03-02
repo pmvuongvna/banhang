@@ -156,7 +156,7 @@ const App = {
             Sales.loadSales(date),
             Transactions.loadTransactions(date)
         ]);
-        Reports.updateReports('month');
+        Reports.updateReports();
 
         // Initialize and update dashboard chart
         DashboardChart.init();
@@ -209,8 +209,7 @@ const App = {
 
         // Refresh reports when switching to reports tab
         if (tabName === 'reports') {
-            const period = document.getElementById('report-period').value;
-            Reports.updateReports(period);
+            Reports.updateReports();
         }
     },
 
@@ -317,6 +316,7 @@ const App = {
                 Sales.updateMonthLabel(date);
                 Transactions.currentViewDate = new Date(date);
                 Transactions.updateMonthLabel();
+                Reports.updateMonthLabel(date);
             }
         });
 

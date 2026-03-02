@@ -363,16 +363,17 @@
             <!-- Reports Tab -->
             <section id="tab-reports" class="tab-content">
                 <div class="tab-header">
-                    <h2>📊 Báo cáo thống kê</h2>
-                    <div class="header-actions">
-                        <div class="date-filter">
-                            <select id="report-period">
-                                <option value="today">Hôm nay</option>
-                                <option value="week">Tuần này</option>
-                                <option value="month" selected>Tháng này</option>
-                                <option value="all">Tất cả</option>
-                            </select>
+                    <div class="tab-header-left">
+                        <h2>📊 Báo cáo thống kê</h2>
+                        <div class="tab-month-selector">
+                            <button class="btn-icon btn-month-nav" onclick="Reports.prevMonth()"
+                                title="Tháng trước">◀</button>
+                            <span id="reports-month-label" class="month-label">---</span>
+                            <button class="btn-icon btn-month-nav" onclick="Reports.nextMonth()"
+                                title="Tháng sau">▶</button>
                         </div>
+                    </div>
+                    <div class="header-actions">
                         <button id="btn-export-report" class="btn btn-success">📥 Xuất báo cáo</button>
                     </div>
                 </div>
