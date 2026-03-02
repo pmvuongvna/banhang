@@ -21,6 +21,7 @@ const Transactions = {
             if (!sheetIds[sheetName]) {
                 console.log(`Sheet ${sheetName} not found, returning empty transactions`);
                 this.transactions = [];
+                this.renderTransactions();
                 this.updateSummary();
                 return [];
             }
@@ -48,6 +49,9 @@ const Transactions = {
             return this.transactions;
         } catch (error) {
             console.error('Error loading transactions:', error);
+            this.transactions = [];
+            this.renderTransactions();
+            this.updateSummary();
             return [];
         }
     },

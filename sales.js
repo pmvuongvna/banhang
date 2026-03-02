@@ -21,6 +21,7 @@ const Sales = {
                 console.log(`Sheet ${sheetName} not found, returning empty sales`);
                 this.sales = [];
                 this.updateDashboardStats();
+                this.renderSalesHistory();
                 return [];
             }
 
@@ -40,6 +41,9 @@ const Sales = {
             return this.sales;
         } catch (error) {
             console.error('Error loading sales:', error);
+            this.sales = [];
+            this.updateDashboardStats();
+            this.renderSalesHistory();
             return [];
         }
     },
