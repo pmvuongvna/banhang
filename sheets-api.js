@@ -9,6 +9,8 @@ const SheetsAPI = {
     spreadsheetId: null,
     isInitialized: false,
     tokenExpiresAt: null,
+    refreshTimer: null,
+    onSignInCallback: null,
 
     /**
      * Initialize Google API
@@ -49,6 +51,71 @@ const SheetsAPI = {
 
         localStorage.setItem('qlbh_access_token', accessToken);
         localStorage.setItem('qlbh_token_expires', expiresAt.toString());
+
+        // Schedule auto-refresh
+        this.scheduleTokenRefresh(expiresIn);
+    },
+
+    /**
+     * Schedule automatic token refresh before expiry
+     * Refreshes 5 minutes before token expires
+     */
+    scheduleTokenRefresh(expiresInSeconds) {
+        // Clear any existing timer
+        if (this.refreshTimer) {
+            clearTimeout(this.refreshTimer);
+            this.refreshTimer = null;
+        }
+
+        // Refresh 5 minutes (300s) before expiry, minimum 30 seconds
+        const refreshInMs = Math.max((expiresInSeconds - 300) * 1000, 30000);
+        console.log(`Token refresh scheduled in ${Math.round(refreshInMs / 60000)} minutes`);
+
+        this.refreshTimer = setTimeout(() => {
+            console.log('Auto-refreshing token...');
+            this.silentRefresh();
+        }, refreshInMs);
+    },
+
+    /**
+     * Silently refresh token without user interaction
+     */
+    silentRefresh() {
+        if (this.tokenClient) {
+            try {
+                // prompt: '' means no user interaction, silent refresh
+                this.tokenClient.requestAccessToken({ prompt: '' });
+            } catch (error) {
+                console.error('Silent token refresh failed:', error);
+            }
+        }
+    },
+
+    /**
+     * Ensure token is valid before making API calls
+     * If expired or about to expire, refresh silently
+     */
+    async ensureValidToken() {
+        if (!this.accessToken) return false;
+
+        // If token expires in less than 2 minutes, refresh now
+        if (Date.now() > this.tokenExpiresAt - 120000) {
+            console.log('Token expiring soon, refreshing...');
+            return new Promise((resolve) => {
+                const originalCallback = this.onSignInCallback;
+                // Temporarily override callback to resolve promise
+                const tempCallback = this.tokenClient._callback;
+
+                this.tokenClient.requestAccessToken({ prompt: '' });
+
+                // Give it 5 seconds max to refresh
+                setTimeout(() => {
+                    resolve(this.hasValidToken());
+                }, 5000);
+            });
+        }
+
+        return true;
     },
 
     /**
@@ -60,12 +127,16 @@ const SheetsAPI = {
 
         if (savedToken && expiresAt) {
             const expiryTime = parseInt(expiresAt);
-            // Check if token is still valid (with 5 minute buffer)
-            if (Date.now() < expiryTime - 300000) {
+            // Check if token is still valid (with 2 minute buffer)
+            if (Date.now() < expiryTime - 120000) {
                 this.accessToken = savedToken;
                 this.tokenExpiresAt = expiryTime;
                 // Set token for gapi client
                 gapi.client.setToken({ access_token: savedToken });
+
+                // Schedule refresh for remaining time
+                const remainingSeconds = Math.floor((expiryTime - Date.now()) / 1000);
+                this.scheduleTokenRefresh(remainingSeconds);
                 return true;
             } else {
                 // Token expired, clear it
@@ -76,6 +147,15 @@ const SheetsAPI = {
     },
 
     /**
+     * Check if user has valid token
+     */
+    hasValidToken() {
+        if (!this.accessToken || !this.tokenExpiresAt) return false;
+        // Check with 1 minute buffer
+        return Date.now() < this.tokenExpiresAt - 60000;
+    },
+
+    /**
      * Clear saved token
      */
     clearToken() {
@@ -83,21 +163,17 @@ const SheetsAPI = {
         localStorage.removeItem('qlbh_token_expires');
         this.accessToken = null;
         this.tokenExpiresAt = null;
-    },
-
-    /**
-     * Check if user has valid token
-     */
-    hasValidToken() {
-        if (!this.accessToken || !this.tokenExpiresAt) return false;
-        // Check with 5 minute buffer
-        return Date.now() < this.tokenExpiresAt - 300000;
+        if (this.refreshTimer) {
+            clearTimeout(this.refreshTimer);
+            this.refreshTimer = null;
+        }
     },
 
     /**
      * Initialize Token Client for OAuth
      */
     initTokenClient(callback) {
+        this.onSignInCallback = callback;
         this.tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CONFIG.CLIENT_ID,
             scope: CONFIG.SCOPES,
@@ -109,6 +185,7 @@ const SheetsAPI = {
                 // Save token with expiry (default 1 hour = 3600 seconds)
                 const expiresIn = response.expires_in || 3600;
                 this.saveToken(response.access_token, expiresIn);
+                console.log(`Token refreshed, valid for ${Math.round(expiresIn / 60)} minutes`);
                 callback(response);
             }
         });
