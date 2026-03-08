@@ -129,6 +129,10 @@
                 <span class="nav-icon">💰</span>
                 <span class="nav-text">Thu chi</span>
             </button>
+            <button class="nav-btn" data-tab="debts">
+                <span class="nav-icon">💳</span>
+                <span class="nav-text">Công nợ</span>
+            </button>
             <button class="nav-btn" data-tab="reports">
                 <span class="nav-icon">📊</span>
                 <span class="nav-text">Báo cáo</span>
@@ -190,6 +194,34 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Advanced Dashboard Charts -->
+                <div class="dashboard-charts-grid">
+                    <div class="section chart-section">
+                        <div class="chart-header">
+                            <h3>📈 Tỷ lệ lợi nhuận</h3>
+                        </div>
+                        <div class="chart-container chart-small">
+                            <canvas id="profit-ratio-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="section chart-section">
+                        <div class="chart-header">
+                            <h3>📅 So sánh tháng trước</h3>
+                        </div>
+                        <div class="chart-container chart-small">
+                            <canvas id="month-comparison-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="section chart-section">
+                        <div class="chart-header">
+                            <h3>📆 Doanh thu theo thứ</h3>
+                        </div>
+                        <div class="chart-container chart-small">
+                            <canvas id="weekday-revenue-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- Products Tab -->
@@ -200,8 +232,11 @@
                         <span>+ Thêm sản phẩm</span>
                     </button>
                 </div>
-                <div class="search-bar">
+                <div class="search-bar search-bar-with-filter">
                     <input type="text" id="search-products" placeholder="🔍 Tìm kiếm theo tên hoặc mã...">
+                    <select id="filter-category" class="category-filter-select">
+                        <option value="all">📁 Tất cả danh mục</option>
+                    </select>
                 </div>
                 <div class="table-container">
                     <table class="data-table" id="products-table">
@@ -209,6 +244,7 @@
                             <tr>
                                 <th>Mã SP</th>
                                 <th>Tên sản phẩm</th>
+                                <th>Danh mục</th>
                                 <th>Giá nhập</th>
                                 <th>Giá bán</th>
                                 <th>Lãi</th>
@@ -248,6 +284,19 @@
                         <div class="cart-summary">
                             <div class="form-group cart-note">
                                 <input type="text" id="cart-note" placeholder="📝 Ghi chú đơn hàng (tùy chọn)...">
+                            </div>
+                            <!-- Debt checkout option -->
+                            <div class="debt-checkout-option">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="cart-debt-toggle">
+                                    <span>💳 Bán nợ</span>
+                                </label>
+                                <div id="debt-fields" class="debt-fields" style="display: none;">
+                                    <input type="text" id="cart-customer-name" placeholder="Tên khách hàng" required>
+                                    <input type="text" id="cart-customer-phone" placeholder="Số điện thoại">
+                                    <input type="number" id="cart-prepaid"
+                                        placeholder="Số tiền trả trước (0 = nợ toàn bộ)" min="0">
+                                </div>
                             </div>
                             <div class="summary-row">
                                 <span>Tổng tiền:</span>
@@ -360,6 +409,59 @@
                 </div>
             </section>
 
+            <!-- Debts Tab -->
+            <section id="tab-debts" class="tab-content">
+                <div class="tab-header">
+                    <div class="tab-header-left">
+                        <h2>💳 Quản lý công nợ</h2>
+                    </div>
+                    <div class="header-actions">
+                        <div class="filter-group">
+                            <button class="filter-btn active" data-filter="all">Tất cả</button>
+                            <button class="filter-btn pending" data-filter="pending">⏳ Còn nợ</button>
+                            <button class="filter-btn paid" data-filter="paid">✅ Đã trả</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="transactions-summary">
+                    <div class="summary-card">
+                        <span class="label">Tổng công nợ</span>
+                        <span id="debt-total" class="value">0đ</span>
+                    </div>
+                    <div class="summary-card income">
+                        <span class="label">Đã thu</span>
+                        <span id="debt-paid" class="value">0đ</span>
+                    </div>
+                    <div class="summary-card expense">
+                        <span class="label">Còn phải thu</span>
+                        <span id="debt-remaining" class="value">0đ</span>
+                    </div>
+                    <div class="summary-card balance">
+                        <span class="label">Số người nợ</span>
+                        <span id="debt-count" class="value">0</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="debts-table">
+                        <thead>
+                            <tr>
+                                <th>Mã nợ</th>
+                                <th>Tên khách</th>
+                                <th>SĐT</th>
+                                <th>Tổng tiền</th>
+                                <th>Đã trả</th>
+                                <th>Còn nợ</th>
+                                <th>Trạng thái</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="debts-tbody">
+                            <!-- Debts will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- Reports Tab -->
             <section id="tab-reports" class="tab-content">
                 <div class="tab-header">
@@ -438,6 +540,19 @@
                         <label for="product-stock">Tồn kho</label>
                         <input type="number" id="product-stock" placeholder="0" min="0" value="0">
                     </div>
+                    <div class="form-group">
+                        <label for="product-category">Danh mục</label>
+                        <select id="product-category">
+                            <option value="Chung">Chung</option>
+                            <option value="Thực phẩm">Thực phẩm</option>
+                            <option value="Đồ uống">Đồ uống</option>
+                            <option value="Điện tử">Điện tử</option>
+                            <option value="Gia dụng">Gia dụng</option>
+                            <option value="Khác">Khác</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
                     <div class="form-group">
                         <label>Lãi (tự động tính)</label>
                         <input type="text" id="product-profit-display" readonly disabled>
@@ -571,6 +686,36 @@
         </div>
     </div>
 
+    <!-- Modal for Pay Debt -->
+    <div id="modal-pay-debt" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>💰 Thanh toán công nợ</h3>
+                <button class="btn-close" data-close="modal-pay-debt">&times;</button>
+            </div>
+            <form id="form-pay-debt">
+                <input type="hidden" id="pay-debt-id">
+                <div class="form-group">
+                    <label>Khách hàng</label>
+                    <p id="pay-debt-customer" class="form-static-text"></p>
+                </div>
+                <div class="form-group">
+                    <label>Còn nợ</label>
+                    <p id="pay-debt-remaining" class="form-static-text debt-remaining-value"></p>
+                </div>
+                <div class="form-group">
+                    <label for="pay-debt-amount">Số tiền thanh toán</label>
+                    <input type="number" id="pay-debt-amount" placeholder="Nhập số tiền" min="1" required>
+                    <button type="button" id="pay-debt-full" class="btn btn-text">Trả hết</button>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modal-pay-debt">Hủy</button>
+                    <button type="submit" class="btn btn-success">💰 Xác nhận thanh toán</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="toast">
         <span id="toast-message"></span>
@@ -593,6 +738,7 @@
     <script src="sales.js"></script>
     <script src="transactions.js"></script>
     <script src="reports.js"></script>
+    <script src="debt.js"></script>
     <script src="chart.js"></script>
     <script src="inline-edit.js"></script>
     <script src="export.js"></script>

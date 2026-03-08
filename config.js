@@ -35,8 +35,12 @@ const CONFIG = {
         PRODUCTS: 'Products',
         SALES: 'Sales',
         TRANSACTIONS: 'Transactions',
+        DEBTS: 'Debts',
         SETTINGS: 'Settings'
     },
+
+    // Default product categories
+    CATEGORIES: ['Chung', 'Thực phẩm', 'Đồ uống', 'Điện tử', 'Gia dụng', 'Khác'],
 
     // Local storage keys
     STORAGE_KEYS: {
@@ -49,4 +53,5 @@ const CONFIG = {
 // Freeze config to prevent accidental modification
 Object.freeze(CONFIG);
 Object.freeze(CONFIG.SHEETS);
+Object.freeze(CONFIG.CATEGORIES);
 Object.freeze(CONFIG.STORAGE_KEYS);

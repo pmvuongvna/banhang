@@ -225,6 +225,16 @@ const Sales = {
             return;
         }
 
+        // Check if debt sale
+        const isDebtSale = document.getElementById('cart-debt-toggle')?.checked;
+        if (isDebtSale) {
+            const customerName = document.getElementById('cart-customer-name')?.value.trim();
+            if (!customerName) {
+                App.showToast('Vui lòng nhập tên khách hàng', 'error');
+                return;
+            }
+        }
+
         App.showLoading(true);
 
         try {
@@ -250,6 +260,13 @@ const Sales = {
             // Ensure sheet exists with headers
             await SheetsAPI.ensureSheetExists(sheetName, ['Mã đơn', 'Ngày giờ', 'Chi tiết', 'Tổng tiền', 'Lợi nhuận', 'Ghi chú']);
 
+            // Determine note for sale
+            let saleNote = note;
+            if (isDebtSale) {
+                const customerName = document.getElementById('cart-customer-name').value.trim();
+                saleNote = `[NỢ] ${customerName}${note ? ' - ' + note : ''}`;
+            }
+
             // Save sale to sheet
             await SheetsAPI.appendData(sheetName, [
                 saleId,
@@ -257,7 +274,7 @@ const Sales = {
                 details.join(', '),
                 total,
                 profit,
-                note
+                saleNote
             ]);
 
             // Update stock
@@ -265,23 +282,47 @@ const Sales = {
                 await Products.updateStock(item.code, -item.quantity);
             }
 
-            // ADD TRANSACTION
-            const productNames = this.cart.map(item => item.name).join(', ');
-            // Transactions also use monthly sheets now
-            await Transactions.addTransaction('income', productNames, total, note || `Đơn: ${saleId}`, now);
+            // Handle debt or normal payment
+            if (isDebtSale) {
+                const customerName = document.getElementById('cart-customer-name').value.trim();
+                const customerPhone = document.getElementById('cart-customer-phone')?.value.trim() || '';
+                const prepaid = parseFloat(document.getElementById('cart-prepaid')?.value) || 0;
+
+                // Create debt record
+                await Debt.addDebt(saleId, customerName, customerPhone, total, prepaid);
+
+                // Only add transaction for prepaid amount (if any)
+                if (prepaid > 0) {
+                    await Transactions.addTransaction('income', `Bán nợ (trả trước): ${customerName}`, prepaid, `Đơn: ${saleId}`, now);
+                }
+
+                App.showToast(`Bán nợ thành công cho ${customerName}! Tổng: ${Products.formatCurrency(total)}, Trả trước: ${Products.formatCurrency(prepaid)}`, 'success');
+            } else {
+                // Normal sale - add full income transaction
+                const productNames = this.cart.map(item => item.name).join(', ');
+                await Transactions.addTransaction('income', productNames, total, note || `Đơn: ${saleId}`, now);
+                App.showToast(`Thanh toán thành công! Tổng: ${Products.formatCurrency(total)}`, 'success');
+            }
 
             // Clear cart & reload
             this.cart = [];
             this.renderCart();
             document.getElementById('cart-note').value = '';
+            // Reset debt fields
+            const debtToggle = document.getElementById('cart-debt-toggle');
+            if (debtToggle) {
+                debtToggle.checked = false;
+                document.getElementById('debt-fields').style.display = 'none';
+                document.getElementById('cart-customer-name').value = '';
+                document.getElementById('cart-customer-phone').value = '';
+                document.getElementById('cart-prepaid').value = '';
+            }
+
             await Products.loadProducts();
 
-            // Reload sales for CURRENT SELECTED month (which might not be this month, but likely we want to see the result if it matches)
-            // But best to reload based on current selector
+            // Reload sales for CURRENT SELECTED month
             const currentSelectedDate = new Date(document.getElementById('month-selector').value + '-01');
             await this.loadSales(currentSelectedDate);
-
-            App.showToast(`Thanh toán thành công! Tổng: ${Products.formatCurrency(total)}`, 'success');
 
         } catch (error) {
             console.error('Error during checkout:', error);
@@ -670,6 +711,15 @@ const Sales = {
         document.getElementById('btn-checkout').addEventListener('click', () => {
             this.checkout();
         });
+
+        // Debt toggle
+        const debtToggle = document.getElementById('cart-debt-toggle');
+        if (debtToggle) {
+            debtToggle.addEventListener('change', (e) => {
+                const debtFields = document.getElementById('debt-fields');
+                debtFields.style.display = e.target.checked ? 'flex' : 'none';
+            });
+        }
 
         // Add old sale button
         document.getElementById('btn-add-sale')?.addEventListener('click', () => {

@@ -12,7 +12,7 @@ const Products = {
      */
     async loadProducts() {
         try {
-            const data = await SheetsAPI.readData(`${CONFIG.SHEETS.PRODUCTS}!A2:G`);
+            const data = await SheetsAPI.readData(`${CONFIG.SHEETS.PRODUCTS}!A2:H`);
             this.products = data.map((row, index) => ({
                 rowIndex: index + 2, // +2 because of 0-index and header row
                 code: row[0] || '',
@@ -21,7 +21,8 @@ const Products = {
                 price: parseFloat(row[3]) || 0,
                 profit: parseFloat(row[4]) || 0,
                 stock: parseInt(row[5]) || 0,
-                createdAt: row[6] || ''
+                createdAt: row[6] || '',
+                category: row[7] || 'Chung'
             }));
             this.renderProducts();
             this.updateStats();
@@ -36,20 +37,25 @@ const Products = {
     /**
      * Render products table
      */
-    renderProducts(filter = '') {
+    renderProducts(filter = '', categoryFilter = '') {
         const tbody = document.getElementById('products-tbody');
-        const filtered = filter
+        let filtered = filter
             ? this.products.filter(p =>
                 p.name.toLowerCase().includes(filter.toLowerCase()) ||
                 p.code.toLowerCase().includes(filter.toLowerCase())
             )
             : this.products;
 
+        // Apply category filter
+        if (categoryFilter && categoryFilter !== 'all') {
+            filtered = filtered.filter(p => p.category === categoryFilter);
+        }
+
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="empty-state">
-                        ${filter ? 'Không tìm thấy sản phẩm' : 'Chưa có sản phẩm nào. Thêm sản phẩm đầu tiên!'}
+                    <td colspan="8" class="empty-state">
+                        ${filter || categoryFilter ? 'Không tìm thấy sản phẩm' : 'Chưa có sản phẩm nào. Thêm sản phẩm đầu tiên!'}
                     </td>
                 </tr>
             `;
@@ -60,6 +66,7 @@ const Products = {
             <tr data-row="${p.rowIndex}">
                 <td><strong>${this.escapeHtml(p.code)}</strong></td>
                 <td>${this.escapeHtml(p.name)}</td>
+                <td><span class="category-badge">${this.escapeHtml(p.category)}</span></td>
                 <td>${this.formatCurrency(p.cost)}</td>
                 <td>${this.formatCurrency(p.price)}</td>
                 <td style="color: var(--accent-success)">${this.formatCurrency(p.profit)}</td>
@@ -103,6 +110,7 @@ const Products = {
         document.getElementById('product-cost').value = product.cost;
         document.getElementById('product-price').value = product.price;
         document.getElementById('product-stock').value = product.stock;
+        document.getElementById('product-category').value = product.category || 'Chung';
         document.getElementById('product-profit-display').value = this.formatCurrency(product.profit);
         document.getElementById('modal-product').classList.add('active');
     },
@@ -116,6 +124,7 @@ const Products = {
         const cost = parseFloat(document.getElementById('product-cost').value) || 0;
         const price = parseFloat(document.getElementById('product-price').value) || 0;
         const stock = parseInt(document.getElementById('product-stock').value) || 0;
+        const category = document.getElementById('product-category').value || 'Chung';
         const profit = price - cost;
 
         if (!code || !name) {
@@ -132,12 +141,12 @@ const Products = {
         App.showLoading(true);
 
         try {
-            const values = [code, name, cost, price, profit, stock, new Date().toLocaleDateString('vi-VN')];
+            const values = [code, name, cost, price, profit, stock, new Date().toLocaleDateString('vi-VN'), category];
 
             if (this.editingProductRow) {
                 // Update existing product
                 await SheetsAPI.updateData(
-                    `${CONFIG.SHEETS.PRODUCTS}!A${this.editingProductRow}:G${this.editingProductRow}`,
+                    `${CONFIG.SHEETS.PRODUCTS}!A${this.editingProductRow}:H${this.editingProductRow}`,
                     [values]
                 );
                 App.showToast('Đã cập nhật sản phẩm');
@@ -177,7 +186,8 @@ const Products = {
                 product.price,
                 product.profit,
                 product.stock,
-                new Date().toLocaleDateString('vi-VN')
+                new Date().toLocaleDateString('vi-VN'),
+                product.category || 'Chung'
             ];
 
             await SheetsAPI.appendData(CONFIG.SHEETS.PRODUCTS, values);
@@ -332,8 +342,18 @@ const Products = {
 
         // Search
         document.getElementById('search-products').addEventListener('input', (e) => {
-            this.renderProducts(e.target.value);
+            const catFilter = document.getElementById('filter-category');
+            this.renderProducts(e.target.value, catFilter ? catFilter.value : '');
         });
+
+        // Category filter
+        const catFilterEl = document.getElementById('filter-category');
+        if (catFilterEl) {
+            catFilterEl.addEventListener('change', (e) => {
+                const searchVal = document.getElementById('search-products').value;
+                this.renderProducts(searchVal, e.target.value);
+            });
+        }
 
         // Form submit
         document.getElementById('form-product').addEventListener('submit', (e) => {

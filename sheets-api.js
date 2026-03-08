@@ -264,6 +264,12 @@ const SheetsAPI = {
                     },
                     {
                         properties: {
+                            title: CONFIG.SHEETS.DEBTS,
+                            gridProperties: { frozenRowCount: 1 }
+                        }
+                    },
+                    {
+                        properties: {
                             title: CONFIG.SHEETS.SETTINGS,
                             gridProperties: { frozenRowCount: 1 }
                         }
@@ -290,10 +296,10 @@ const SheetsAPI = {
      */
     async initializeHeaders(storeName) {
         const requests = [
-            // Products headers
+            // Products headers (includes Category column H)
             {
-                range: `${CONFIG.SHEETS.PRODUCTS}!A1:G1`,
-                values: [['Mã SP', 'Tên SP', 'Giá nhập', 'Giá bán', 'Lãi', 'Tồn kho', 'Ngày tạo']]
+                range: `${CONFIG.SHEETS.PRODUCTS}!A1:H1`,
+                values: [['Mã SP', 'Tên SP', 'Giá nhập', 'Giá bán', 'Lãi', 'Tồn kho', 'Ngày tạo', 'Danh mục']]
             },
             // Sales headers
             {
@@ -304,6 +310,11 @@ const SheetsAPI = {
             {
                 range: `${CONFIG.SHEETS.TRANSACTIONS}!A1:F1`,
                 values: [['ID', 'Ngày', 'Loại', 'Mô tả', 'Số tiền', 'Ghi chú']]
+            },
+            // Debts headers
+            {
+                range: `${CONFIG.SHEETS.DEBTS}!A1:J1`,
+                values: [['Mã nợ', 'Mã đơn', 'Tên khách', 'SĐT', 'Tổng tiền', 'Đã trả', 'Còn nợ', 'Ngày tạo', 'Ngày cập nhật', 'Trạng thái']]
             },
             // Settings data
             {

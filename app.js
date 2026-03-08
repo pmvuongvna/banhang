@@ -38,6 +38,7 @@ const App = {
         Sales.init();
         Transactions.init();
         Reports.init();
+        Debt.init();
 
         // Check for existing valid token and auto-sign in
         if (SheetsAPI.hasValidToken()) {
@@ -154,13 +155,47 @@ const App = {
         await Promise.all([
             Products.loadProducts(), // Products are global, not monthly
             Sales.loadSales(date),
-            Transactions.loadTransactions(date)
+            Transactions.loadTransactions(date),
+            Debt.loadDebts()
         ]);
         Reports.updateReports();
+
+        // Populate category filter dropdown
+        this.populateCategoryFilter();
 
         // Initialize and update dashboard chart
         DashboardChart.init();
         DashboardChart.updateChart('month');
+    },
+
+    /**
+     * Populate category filter dropdown from loaded products
+     */
+    populateCategoryFilter() {
+        const filterEl = document.getElementById('filter-category');
+        if (!filterEl) return;
+
+        // Get unique categories from products
+        const categories = [...new Set(Products.products.map(p => p.category || 'Chung'))];
+
+        // Keep current selection
+        const currentVal = filterEl.value;
+
+        filterEl.innerHTML = '<option value="all">📁 Tất cả danh mục</option>';
+
+        // Add categories from CONFIG
+        CONFIG.CATEGORIES.forEach(cat => {
+            filterEl.innerHTML += `<option value="${cat}">${cat}</option>`;
+        });
+
+        // Add any extra categories from products not in CONFIG
+        categories.forEach(cat => {
+            if (!CONFIG.CATEGORIES.includes(cat)) {
+                filterEl.innerHTML += `<option value="${cat}">${cat}</option>`;
+            }
+        });
+
+        filterEl.value = currentVal || 'all';
     },
 
     /**
