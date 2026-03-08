@@ -160,8 +160,8 @@ const App = {
         ]);
         Reports.updateReports();
 
-        // Populate category filter dropdown
-        this.populateCategoryFilter();
+        // Load categories from Settings sheet & populate dropdowns
+        await this.loadCategories();
 
         // Initialize and update dashboard chart
         DashboardChart.init();
@@ -169,33 +169,227 @@ const App = {
     },
 
     /**
-     * Populate category filter dropdown from loaded products
+     * Dynamic categories list (loaded from Settings sheet)
      */
-    populateCategoryFilter() {
-        const filterEl = document.getElementById('filter-category');
-        if (!filterEl) return;
+    categories: [],
 
-        // Get unique categories from products
-        const categories = [...new Set(Products.products.map(p => p.category || 'Chung'))];
-
-        // Keep current selection
-        const currentVal = filterEl.value;
-
-        filterEl.innerHTML = '<option value="all">📁 Tất cả danh mục</option>';
-
-        // Add categories from CONFIG
-        CONFIG.CATEGORIES.forEach(cat => {
-            filterEl.innerHTML += `<option value="${cat}">${cat}</option>`;
-        });
-
-        // Add any extra categories from products not in CONFIG
-        categories.forEach(cat => {
-            if (!CONFIG.CATEGORIES.includes(cat)) {
-                filterEl.innerHTML += `<option value="${cat}">${cat}</option>`;
+    /**
+     * Load categories from Settings sheet
+     */
+    async loadCategories() {
+        try {
+            const data = await SheetsAPI.readData(`${CONFIG.SHEETS.SETTINGS}!A1:B20`);
+            const catRow = data.find(row => row[0] === 'categories');
+            if (catRow && catRow[1]) {
+                this.categories = catRow[1].split(',').map(c => c.trim()).filter(Boolean);
+            } else {
+                // First time: use defaults and save to settings
+                this.categories = [...CONFIG.CATEGORIES];
+                await this.saveCategories();
             }
-        });
+        } catch (error) {
+            console.error('Error loading categories:', error);
+            this.categories = [...CONFIG.CATEGORIES];
+        }
+        this.populateCategoryDropdowns();
+    },
 
-        filterEl.value = currentVal || 'all';
+    /**
+     * Save categories to Settings sheet
+     */
+    async saveCategories() {
+        try {
+            const data = await SheetsAPI.readData(`${CONFIG.SHEETS.SETTINGS}!A1:B20`);
+            const catRowIndex = data.findIndex(row => row[0] === 'categories');
+            const catValue = this.categories.join(',');
+
+            if (catRowIndex >= 0) {
+                // Update existing row
+                await SheetsAPI.updateData(
+                    `${CONFIG.SHEETS.SETTINGS}!B${catRowIndex + 1}`,
+                    [[catValue]]
+                );
+            } else {
+                // Append new row
+                await SheetsAPI.appendData(CONFIG.SHEETS.SETTINGS, ['categories', catValue]);
+            }
+        } catch (error) {
+            console.error('Error saving categories:', error);
+            this.showToast('Lỗi lưu danh mục', 'error');
+        }
+    },
+
+    /**
+     * Populate ALL category dropdowns from dynamic list
+     */
+    populateCategoryDropdowns() {
+        const cats = this.categories;
+
+        // 1. Filter dropdown on products tab
+        const filterEl = document.getElementById('filter-category');
+        if (filterEl) {
+            const currentVal = filterEl.value;
+            filterEl.innerHTML = '<option value="all">📁 Tất cả danh mục</option>';
+            cats.forEach(cat => {
+                filterEl.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+            // Add any categories from products not in list
+            const extraCats = [...new Set(Products.products.map(p => p.category || 'Chung'))]
+                .filter(c => !cats.includes(c));
+            extraCats.forEach(cat => {
+                filterEl.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+            filterEl.value = currentVal || 'all';
+        }
+
+        // 2. Product modal dropdown
+        const modalEl = document.getElementById('product-category');
+        if (modalEl) {
+            const currentVal = modalEl.value;
+            modalEl.innerHTML = '';
+            cats.forEach(cat => {
+                modalEl.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+            if (currentVal && cats.includes(currentVal)) {
+                modalEl.value = currentVal;
+            }
+        }
+    },
+
+    // Alias for backward compatibility
+    populateCategoryFilter() {
+        this.populateCategoryDropdowns();
+    },
+
+    /**
+     * Show category management modal
+     */
+    showCategoryManager() {
+        this.renderCategoryList();
+        document.getElementById('modal-categories').classList.add('active');
+    },
+
+    /**
+     * Render category list in management modal
+     */
+    renderCategoryList() {
+        const list = document.getElementById('category-list');
+        if (!list) return;
+
+        if (this.categories.length === 0) {
+            list.innerHTML = '<p class="empty-state">Chưa có danh mục nào</p>';
+            return;
+        }
+
+        list.innerHTML = this.categories.map((cat, index) => `
+            <div class="category-item" data-index="${index}">
+                <input type="text" class="category-name-input" value="${cat}" data-original="${cat}">
+                <div class="category-item-actions">
+                    <button class="action-btn edit" onclick="App.renameCategoryAt(${index})" title="Lưu tên mới">💾</button>
+                    <button class="action-btn delete" onclick="App.deleteCategoryAt(${index})" title="Xóa">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    },
+
+    /**
+     * Add a new category
+     */
+    async addCategory() {
+        const input = document.getElementById('new-category-name');
+        const name = input.value.trim();
+
+        if (!name) {
+            this.showToast('Vui lòng nhập tên danh mục', 'error');
+            return;
+        }
+
+        if (this.categories.includes(name)) {
+            this.showToast('Danh mục đã tồn tại', 'error');
+            return;
+        }
+
+        this.categories.push(name);
+        await this.saveCategories();
+        this.populateCategoryDropdowns();
+        this.renderCategoryList();
+        input.value = '';
+        this.showToast(`Đã thêm danh mục "${name}"`);
+    },
+
+    /**
+     * Rename category at index (from inline edit)
+     */
+    async renameCategoryAt(index) {
+        const item = document.querySelector(`.category-item[data-index="${index}"]`);
+        const input = item?.querySelector('.category-name-input');
+        if (!input) return;
+
+        const newName = input.value.trim();
+        const oldName = input.dataset.original;
+
+        if (!newName) {
+            this.showToast('Tên danh mục không được trống', 'error');
+            return;
+        }
+
+        if (newName === oldName) return; // No change
+
+        if (this.categories.includes(newName)) {
+            this.showToast('Tên danh mục đã tồn tại', 'error');
+            return;
+        }
+
+        // Update category name in list
+        this.categories[index] = newName;
+        await this.saveCategories();
+
+        // Update all products with the old category name
+        const affectedProducts = Products.products.filter(p => p.category === oldName);
+        for (const product of affectedProducts) {
+            product.category = newName;
+            await SheetsAPI.updateData(
+                `${CONFIG.SHEETS.PRODUCTS}!H${product.rowIndex}`,
+                [[newName]]
+            );
+        }
+
+        this.populateCategoryDropdowns();
+        this.renderCategoryList();
+        Products.renderProducts();
+        this.showToast(`Đã đổi tên "${oldName}" → "${newName}" (${affectedProducts.length} sản phẩm cập nhật)`);
+    },
+
+    /**
+     * Delete category at index
+     */
+    async deleteCategoryAt(index) {
+        const catName = this.categories[index];
+        const affectedProducts = Products.products.filter(p => p.category === catName);
+
+        const msg = affectedProducts.length > 0
+            ? `Xóa danh mục "${catName}"? ${affectedProducts.length} sản phẩm sẽ chuyển về "Chung".`
+            : `Xóa danh mục "${catName}"?`;
+
+        if (!confirm(msg)) return;
+
+        // Remove from list
+        this.categories.splice(index, 1);
+        await this.saveCategories();
+
+        // Move affected products to "Chung"
+        for (const product of affectedProducts) {
+            product.category = 'Chung';
+            await SheetsAPI.updateData(
+                `${CONFIG.SHEETS.PRODUCTS}!H${product.rowIndex}`,
+                [['Chung']]
+            );
+        }
+
+        this.populateCategoryDropdowns();
+        this.renderCategoryList();
+        Products.renderProducts();
+        this.showToast(`Đã xóa danh mục "${catName}"`);
     },
 
     /**

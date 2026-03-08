@@ -237,6 +237,8 @@
                     <select id="filter-category" class="category-filter-select">
                         <option value="all">📁 Tất cả danh mục</option>
                     </select>
+                    <button class="btn btn-sm btn-outline" onclick="App.showCategoryManager()"
+                        title="Quản lý danh mục">⚙️</button>
                 </div>
                 <div class="table-container">
                     <table class="data-table" id="products-table">
@@ -543,12 +545,7 @@
                     <div class="form-group">
                         <label for="product-category">Danh mục</label>
                         <select id="product-category">
-                            <option value="Chung">Chung</option>
-                            <option value="Thực phẩm">Thực phẩm</option>
-                            <option value="Đồ uống">Đồ uống</option>
-                            <option value="Điện tử">Điện tử</option>
-                            <option value="Gia dụng">Gia dụng</option>
-                            <option value="Khác">Khác</option>
+                            <!-- Populated dynamically by App.populateCategoryDropdowns() -->
                         </select>
                     </div>
                 </div>
@@ -713,6 +710,26 @@
                     <button type="submit" class="btn btn-success">💰 Xác nhận thanh toán</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal for Category Management -->
+    <div id="modal-categories" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚙️ Quản lý danh mục</h3>
+                <button class="btn-close" data-close="modal-categories">&times;</button>
+            </div>
+            <div class="category-manager">
+                <div class="category-add-form">
+                    <input type="text" id="new-category-name" placeholder="Tên danh mục mới...">
+                    <button class="btn btn-primary btn-sm" onclick="App.addCategory()">+ Thêm</button>
+                </div>
+                <div id="category-list" class="category-list">
+                    <!-- Populated dynamically -->
+                </div>
+                <p class="category-hint">💡 Sửa tên trực tiếp rồi bấm 💾 để lưu. Xóa danh mục sẽ chuyển sản phẩm về "Chung".</p>
+            </div>
         </div>
     </div>
 
