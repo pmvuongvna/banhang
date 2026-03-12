@@ -16,6 +16,14 @@ const App = {
         // Initialize theme
         this.initTheme();
 
+        // Initialize IndexedDB
+        try {
+            await DB.init();
+            console.log('IndexedDB initialized');
+        } catch (error) {
+            console.warn('IndexedDB not available, will use API-only mode:', error);
+        }
+
         // Initialize Google API
         try {
             await SheetsAPI.init();
@@ -27,6 +35,7 @@ const App = {
 
         // Initialize OAuth token client
         SheetsAPI.initTokenClient(async (response) => {
+            SheetsAPI.startTokenGuard();
             await this.onSignIn();
         });
 
@@ -43,6 +52,7 @@ const App = {
         // Check for existing valid token and auto-sign in
         if (SheetsAPI.hasValidToken()) {
             console.log('Found valid saved token, auto-signing in...');
+            SheetsAPI.startTokenGuard();
             await this.onSignIn();
         }
     },
@@ -142,7 +152,7 @@ const App = {
     },
 
     /**
-     * Load all data from sheets
+     * Load all data from sheets (with IndexedDB caching)
      */
     async loadAllData(date = new Date()) {
         const monthSelector = document.getElementById('month-selector');
@@ -152,6 +162,18 @@ const App = {
             monthSelector.value = monthStr;
         }
 
+        // Pull data from Sheets → IndexedDB (batch API)
+        if (DB.isReady() && SheetsAPI.spreadsheetId) {
+            await SyncEngine.pullAll(date);
+            // Push any pending offline changes
+            SyncEngine.pushChanges();
+            // Initialize sync engine if not yet started
+            if (!SyncEngine.syncInterval) {
+                SyncEngine.init();
+            }
+        }
+
+        // Load data into modules (reads from Sheets or local cache)
         await Promise.all([
             Products.loadProducts(), // Products are global, not monthly
             Sales.loadSales(date),

@@ -10,6 +10,8 @@ const SheetsAPI = {
     isInitialized: false,
     tokenExpiresAt: null,
     refreshTimer: null,
+    wakeDetectionTimer: null,
+    lastHeartbeat: Date.now(),
     onSignInCallback: null,
 
     /**
@@ -116,6 +118,69 @@ const SheetsAPI = {
         }
 
         return true;
+    },
+
+    /**
+     * Execute an API call with automatic 401 retry
+     * If the call fails with 401, refresh token and retry once
+     */
+    async apiCallWithRetry(apiCall) {
+        try {
+            return await apiCall();
+        } catch (error) {
+            // Check for 401 Unauthorized
+            const status = error?.status || error?.result?.error?.code;
+            if (status === 401) {
+                console.log('[Token] 401 detected, attempting refresh...');
+                const refreshed = await this.ensureValidToken();
+                if (refreshed) {
+                    console.log('[Token] Refresh successful, retrying API call...');
+                    return await apiCall(); // Retry once
+                } else {
+                    console.log('[Token] Refresh failed, user needs to re-login');
+                }
+            }
+            throw error;
+        }
+    },
+
+    /**
+     * Start token guard: visibility change + wake detection
+     * Call this after successful sign-in
+     */
+    startTokenGuard() {
+        // 1. Visibility change: refresh when tab regains focus
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && this.accessToken) {
+                const timeUntilExpiry = this.tokenExpiresAt - Date.now();
+                if (timeUntilExpiry < 120000) { // Less than 2 min
+                    console.log('[TokenGuard] Tab focused, token expiring soon, refreshing...');
+                    this.silentRefresh();
+                } else if (timeUntilExpiry < 300000) { // Less than 5 min
+                    console.log('[TokenGuard] Tab focused, token expires in <5 min');
+                }
+            }
+        });
+
+        // 2. Wake detection: check every 60s for sleep/wake gaps
+        this.lastHeartbeat = Date.now();
+        if (this.wakeDetectionTimer) clearInterval(this.wakeDetectionTimer);
+        this.wakeDetectionTimer = setInterval(() => {
+            const now = Date.now();
+            const elapsed = now - this.lastHeartbeat;
+            this.lastHeartbeat = now;
+
+            // If >90s elapsed (should be ~60s), device likely woke from sleep
+            if (elapsed > 90000 && this.accessToken) {
+                console.log(`[TokenGuard] Wake detected (${Math.round(elapsed/1000)}s gap)`);
+                if (now > this.tokenExpiresAt - 120000) {
+                    console.log('[TokenGuard] Token expired/expiring after wake, refreshing...');
+                    this.silentRefresh();
+                }
+            }
+        }, 60000);
+
+        console.log('[TokenGuard] Token guard active (visibility + wake detection)');
     },
 
     /**
@@ -389,14 +454,16 @@ const SheetsAPI = {
     },
 
     /**
-     * Read data from a range
+     * Read data from a range (with 401 auto-retry)
      */
     async readData(range) {
         try {
-            const response = await gapi.client.sheets.spreadsheets.values.get({
-                spreadsheetId: this.spreadsheetId,
-                range: range
-            });
+            const response = await this.apiCallWithRetry(() =>
+                gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: this.spreadsheetId,
+                    range: range
+                })
+            );
             return response.result.values || [];
         } catch (error) {
             console.error('Error reading data:', error);
@@ -405,17 +472,19 @@ const SheetsAPI = {
     },
 
     /**
-     * Append data to a sheet
+     * Append data to a sheet (with 401 auto-retry)
      */
     async appendData(sheetName, values) {
         try {
-            const response = await gapi.client.sheets.spreadsheets.values.append({
-                spreadsheetId: this.spreadsheetId,
-                range: `${sheetName}!A:Z`,
-                valueInputOption: 'USER_ENTERED',
-                insertDataOption: 'INSERT_ROWS',
-                resource: { values: Array.isArray(values[0]) ? values : [values] }
-            });
+            const response = await this.apiCallWithRetry(() =>
+                gapi.client.sheets.spreadsheets.values.append({
+                    spreadsheetId: this.spreadsheetId,
+                    range: `${sheetName}!A:Z`,
+                    valueInputOption: 'USER_ENTERED',
+                    insertDataOption: 'INSERT_ROWS',
+                    resource: { values: Array.isArray(values[0]) ? values : [values] }
+                })
+            );
             return response.result;
         } catch (error) {
             console.error('Error appending data:', error);
@@ -424,16 +493,18 @@ const SheetsAPI = {
     },
 
     /**
-     * Update data in a specific range
+     * Update data in a specific range (with 401 auto-retry)
      */
     async updateData(range, values) {
         try {
-            const response = await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: this.spreadsheetId,
-                range: range,
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: values }
-            });
+            const response = await this.apiCallWithRetry(() =>
+                gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: this.spreadsheetId,
+                    range: range,
+                    valueInputOption: 'USER_ENTERED',
+                    resource: { values: values }
+                })
+            );
             return response.result;
         } catch (error) {
             console.error('Error updating data:', error);
@@ -442,28 +513,30 @@ const SheetsAPI = {
     },
 
     /**
-     * Delete a row
+     * Delete a row (with 401 auto-retry)
      */
     async deleteRow(sheetName, rowIndex) {
         try {
             const sheetIds = await this.getSheetIds();
             const sheetId = sheetIds[sheetName];
 
-            await gapi.client.sheets.spreadsheets.batchUpdate({
-                spreadsheetId: this.spreadsheetId,
-                resource: {
-                    requests: [{
-                        deleteDimension: {
-                            range: {
-                                sheetId: sheetId,
-                                dimension: 'ROWS',
-                                startIndex: rowIndex,
-                                endIndex: rowIndex + 1
+            await this.apiCallWithRetry(() =>
+                gapi.client.sheets.spreadsheets.batchUpdate({
+                    spreadsheetId: this.spreadsheetId,
+                    resource: {
+                        requests: [{
+                            deleteDimension: {
+                                range: {
+                                    sheetId: sheetId,
+                                    dimension: 'ROWS',
+                                    startIndex: rowIndex,
+                                    endIndex: rowIndex + 1
+                                }
                             }
-                        }
-                    }]
-                }
-            });
+                        }]
+                    }
+                })
+            );
             return true;
         } catch (error) {
             console.error('Error deleting row:', error);
