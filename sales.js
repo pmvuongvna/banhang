@@ -304,6 +304,20 @@ const Sales = {
                 App.showToast(`Thanh toán thành công! Tổng: ${Products.formatCurrency(total)}`, 'success');
             }
 
+            // Send Telegram notification (fire-and-forget)
+            if (typeof TelegramNotify !== 'undefined' && TelegramNotify.isEnabled()) {
+                TelegramNotify.sendSaleNotification({
+                    saleId,
+                    datetime,
+                    details: details.join(', '),
+                    total,
+                    profit,
+                    note: saleNote,
+                    isDebt: isDebtSale,
+                    customerName: isDebtSale ? document.getElementById('cart-customer-name').value.trim() : ''
+                });
+            }
+
             // Clear cart & reload
             this.cart = [];
             this.renderCart();

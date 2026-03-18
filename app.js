@@ -185,6 +185,11 @@ const App = {
         // Load categories from Settings sheet & populate dropdowns
         await this.loadCategories();
 
+        // Load Telegram config
+        if (typeof TelegramNotify !== 'undefined') {
+            await TelegramNotify.loadConfig();
+        }
+
         // Initialize and update dashboard chart
         DashboardChart.init();
         DashboardChart.updateChart('month');
@@ -576,6 +581,21 @@ const App = {
             DataMigration.migrate();
         });
 
+        // Telegram config button
+        document.getElementById('btn-telegram').addEventListener('click', () => {
+            this.showTelegramConfig();
+        });
+
+        // Telegram test button
+        document.getElementById('btn-telegram-test')?.addEventListener('click', () => {
+            this.testTelegramConfig();
+        });
+
+        // Telegram save button
+        document.getElementById('btn-telegram-save')?.addEventListener('click', () => {
+            this.saveTelegramConfig();
+        });
+
         // Sync button
         document.getElementById('btn-sync').addEventListener('click', () => {
             this.syncData();
@@ -634,6 +654,73 @@ const App = {
 
             document.getElementById('modal-export').classList.remove('active');
         });
+    },
+
+    /**
+     * Show Telegram config modal
+     */
+    async showTelegramConfig() {
+        // Populate the fields with current config
+        document.getElementById('telegram-bot-token').value = TelegramNotify.botToken || '';
+        document.getElementById('telegram-chat-id').value = TelegramNotify.chatId || '';
+        document.getElementById('telegram-status').style.display = 'none';
+        document.getElementById('modal-telegram').classList.add('active');
+    },
+
+    /**
+     * Test Telegram configuration
+     */
+    async testTelegramConfig() {
+        const token = document.getElementById('telegram-bot-token').value.trim();
+        const chatId = document.getElementById('telegram-chat-id').value.trim();
+        const statusEl = document.getElementById('telegram-status');
+
+        if (!token || !chatId) {
+            statusEl.textContent = '⚠️ Vui lòng nhập cả Bot Token và Chat ID';
+            statusEl.className = 'telegram-status error';
+            statusEl.style.display = 'block';
+            return;
+        }
+
+        statusEl.textContent = '⏳ Đang gửi tin nhắn test...';
+        statusEl.className = 'telegram-status loading';
+        statusEl.style.display = 'block';
+
+        const result = await TelegramNotify.testConnection(token, chatId);
+        if (result.success) {
+            statusEl.textContent = '✅ Gửi thành công! Kiểm tra Telegram của bạn.';
+            statusEl.className = 'telegram-status success';
+        } else {
+            statusEl.textContent = `❌ Lỗi: ${result.error}`;
+            statusEl.className = 'telegram-status error';
+        }
+    },
+
+    /**
+     * Save Telegram configuration
+     */
+    async saveTelegramConfig() {
+        const token = document.getElementById('telegram-bot-token').value.trim();
+        const chatId = document.getElementById('telegram-chat-id').value.trim();
+        const statusEl = document.getElementById('telegram-status');
+
+        this.showLoading(true);
+        try {
+            await TelegramNotify.saveConfig(token, chatId);
+            statusEl.textContent = token && chatId
+                ? '✅ Đã lưu! Thông báo Telegram đã bật.'
+                : '✅ Đã lưu! Thông báo Telegram đã tắt.';
+            statusEl.className = 'telegram-status success';
+            statusEl.style.display = 'block';
+            this.showToast('Đã lưu cấu hình Telegram');
+        } catch (error) {
+            statusEl.textContent = '❌ Lỗi lưu cấu hình';
+            statusEl.className = 'telegram-status error';
+            statusEl.style.display = 'block';
+            this.showToast('Lỗi lưu cấu hình Telegram', 'error');
+        } finally {
+            this.showLoading(false);
+        }
     }
 };
 
