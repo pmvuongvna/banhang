@@ -80,28 +80,36 @@ const TelegramNotify = {
     async sendMessage(text) {
         if (!this.isEnabled()) return false;
 
-        try {
-            const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: this.chatId,
-                    text: text,
-                    parse_mode: 'HTML'
-                })
-            });
+        // Support multiple chat IDs (comma-separated)
+        const chatIds = this.chatId.split(',').map(id => id.trim()).filter(Boolean);
+        const results = [];
 
-            const result = await response.json();
-            if (!result.ok) {
-                console.error('[Telegram] API error:', result.description);
-                return false;
+        for (const chatId of chatIds) {
+            try {
+                const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: text,
+                        parse_mode: 'HTML'
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.ok) {
+                    console.error(`[Telegram] API error for ${chatId}:`, result.description);
+                    results.push(false);
+                } else {
+                    results.push(true);
+                }
+            } catch (error) {
+                console.error(`[Telegram] Send error for ${chatId}:`, error);
+                results.push(false);
             }
-            return true;
-        } catch (error) {
-            console.error('[Telegram] Send error:', error);
-            return false;
         }
+        return results.some(r => r); // true if at least one succeeded
     },
 
     /**
@@ -141,26 +149,41 @@ const TelegramNotify = {
      * Send test message to verify configuration
      */
     async testConnection(token, chatId) {
-        try {
-            const storeName = localStorage.getItem(CONFIG.STORAGE_KEYS.STORE_NAME) || 'Cửa hàng';
-            const url = `https://api.telegram.org/bot${token}/sendMessage`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: chatId,
-                    text: `✅ <b>Kết nối thành công!</b>\n\n🏪 ${storeName}\n🤖 Bot đã sẵn sàng gửi thông báo đơn hàng mới.`,
-                    parse_mode: 'HTML'
-                })
-            });
+        const storeName = localStorage.getItem(CONFIG.STORAGE_KEYS.STORE_NAME) || 'Cửa hàng';
+        const chatIds = chatId.split(',').map(id => id.trim()).filter(Boolean);
+        const errors = [];
+        let successCount = 0;
 
-            const result = await response.json();
-            if (!result.ok) {
-                throw new Error(result.description || 'Telegram API error');
+        for (const id of chatIds) {
+            try {
+                const url = `https://api.telegram.org/bot${token}/sendMessage`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: id,
+                        text: `✅ <b>Kết nối thành công!</b>\n\n🏪 ${storeName}\n🤖 Bot đã sẵn sàng gửi thông báo đơn hàng mới.`,
+                        parse_mode: 'HTML'
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.ok) {
+                    errors.push(`${id}: ${result.description}`);
+                } else {
+                    successCount++;
+                }
+            } catch (error) {
+                errors.push(`${id}: ${error.message}`);
             }
-            return { success: true };
-        } catch (error) {
-            return { success: false, error: error.message };
+        }
+
+        if (successCount === chatIds.length) {
+            return { success: true, message: `Gửi thành công đến ${successCount} người nhận!` };
+        } else if (successCount > 0) {
+            return { success: true, message: `Gửi được ${successCount}/${chatIds.length}. Lỗi: ${errors.join('; ')}` };
+        } else {
+            return { success: false, error: errors.join('; ') };
         }
     }
 };

@@ -688,7 +688,7 @@ const App = {
 
         const result = await TelegramNotify.testConnection(token, chatId);
         if (result.success) {
-            statusEl.textContent = '✅ Gửi thành công! Kiểm tra Telegram của bạn.';
+            statusEl.textContent = `✅ ${result.message || 'Gửi thành công! Kiểm tra Telegram.'}`;
             statusEl.className = 'telegram-status success';
         } else {
             statusEl.textContent = `❌ Lỗi: ${result.error}`;
