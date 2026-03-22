@@ -2075,3 +2075,96 @@ body {
 .form-hint a:hover {
     text-decoration: underline;
 }
+
+/* ==========================================
+   Custom Item Sales
+   ========================================== */
+.custom-item-section {
+    margin-top: 12px;
+}
+
+.btn-custom-item {
+    width: 100%;
+    font-size: 0.9rem;
+    padding: 10px 16px;
+    transition: all var(--transition-fast);
+}
+
+.btn-custom-item.active {
+    background: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+}
+
+.custom-item-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.custom-item-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.custom-input {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+}
+
+.custom-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.custom-input-sm {
+    max-width: 100px;
+}
+
+/* Custom item badge in cart */
+.custom-badge {
+    font-size: 0.75rem;
+    margin-right: 4px;
+}
+
+.cart-item-custom {
+    border-left: 3px solid var(--accent-warning, #f59e0b);
+}
+
+/* Search no result link */
+.search-no-result a {
+    color: var(--accent-primary);
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.search-no-result a:hover {
+    color: var(--accent-primary-dark, #4f46e5);
+}

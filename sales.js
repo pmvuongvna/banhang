@@ -65,7 +65,7 @@ const Sales = {
         );
 
         if (filtered.length === 0) {
-            container.innerHTML = '<div class="search-item">Không tìm thấy sản phẩm</div>';
+            container.innerHTML = '<div class="search-item search-no-result">Không tìm thấy — <a href="#" onclick="Sales.toggleCustomItemForm(true); return false;">Thêm mặt hàng tự do?</a></div>';
             container.style.display = 'block';
             return;
         }
@@ -118,6 +118,64 @@ const Sales = {
     },
 
     /**
+     * Toggle custom item form visibility
+     */
+    toggleCustomItemForm(forceOpen) {
+        const form = document.getElementById('custom-item-form');
+        const btn = document.getElementById('btn-toggle-custom-item');
+        const isHidden = form.style.display === 'none';
+        const shouldShow = forceOpen === true ? true : isHidden;
+
+        form.style.display = shouldShow ? 'flex' : 'none';
+        btn.classList.toggle('active', shouldShow);
+
+        if (shouldShow) {
+            document.getElementById('custom-item-name').focus();
+        }
+    },
+
+    /**
+     * Add custom (non-catalog) item to cart
+     */
+    addCustomItem() {
+        const name = document.getElementById('custom-item-name').value.trim();
+        const cost = parseFloat(document.getElementById('custom-item-cost').value) || 0;
+        const price = parseFloat(document.getElementById('custom-item-price').value) || 0;
+        const qty = parseInt(document.getElementById('custom-item-qty').value) || 1;
+
+        if (!name) {
+            App.showToast('Vui lòng nhập tên mặt hàng', 'error');
+            return;
+        }
+        if (price <= 0) {
+            App.showToast('Vui lòng nhập giá bán', 'error');
+            return;
+        }
+
+        // Generate a unique code for custom items
+        const customCode = '_CUSTOM_' + Date.now();
+
+        this.cart.push({
+            code: customCode,
+            name: name,
+            price: price,
+            originalPrice: price,
+            cost: cost,
+            quantity: qty,
+            isCustom: true
+        });
+
+        this.renderCart();
+        App.showToast(`Đã thêm "${name}" vào giỏ`);
+
+        // Clear form
+        document.getElementById('custom-item-name').value = '';
+        document.getElementById('custom-item-cost').value = '';
+        document.getElementById('custom-item-price').value = '';
+        document.getElementById('custom-item-qty').value = '1';
+    },
+
+    /**
      * Remove from cart
      */
     removeFromCart(index) {
@@ -155,10 +213,12 @@ const Sales = {
             total += item.price * item.quantity;
             profit += (item.price - item.cost) * item.quantity;
 
+            const customBadge = item.isCustom ? '<span class="custom-badge" title="Mặt hàng tự do">✏️</span>' : '';
+
             return `
-                <div class="cart-item">
+                <div class="cart-item ${item.isCustom ? 'cart-item-custom' : ''}">
                     <div class="cart-item-info">
-                        <div class="cart-item-name">${Products.escapeHtml(item.name)}</div>
+                        <div class="cart-item-name">${customBadge}${Products.escapeHtml(item.name)}</div>
                         <div class="cart-item-price">
                             <input type="number" class="price-input" 
                                 value="${item.price}" 
@@ -187,7 +247,6 @@ const Sales = {
      */
     updateQuantity(index, change) {
         const item = this.cart[index];
-        const product = Products.products.find(p => p.code === item.code);
 
         const newQty = item.quantity + change;
 
@@ -196,9 +255,13 @@ const Sales = {
             return;
         }
 
-        if (product && newQty > product.stock) {
-            App.showToast('Số lượng vượt quá tồn kho', 'warning');
-            return;
+        // Only check stock for catalog products, not custom items
+        if (!item.isCustom) {
+            const product = Products.products.find(p => p.code === item.code);
+            if (product && newQty > product.stock) {
+                App.showToast('Số lượng vượt quá tồn kho', 'warning');
+                return;
+            }
         }
 
         item.quantity = newQty;
@@ -277,9 +340,11 @@ const Sales = {
                 saleNote
             ]);
 
-            // Update stock
+            // Update stock (skip for custom items)
             for (const item of this.cart) {
-                await Products.updateStock(item.code, -item.quantity);
+                if (!item.isCustom) {
+                    await Products.updateStock(item.code, -item.quantity);
+                }
             }
 
             // Handle debt or normal payment

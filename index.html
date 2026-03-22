@@ -275,6 +275,27 @@
                         <div id="product-search-results" class="search-results">
                             <!-- Search results appear here -->
                         </div>
+                        <!-- Custom Item Entry -->
+                        <div class="custom-item-section">
+                            <button type="button" id="btn-toggle-custom-item" class="btn btn-outline btn-custom-item" onclick="Sales.toggleCustomItemForm()">
+                                ✏️ Thêm mặt hàng tự do
+                            </button>
+                            <div id="custom-item-form" class="custom-item-form" style="display: none;">
+                                <div class="custom-item-row">
+                                    <input type="text" id="custom-item-name" placeholder="Tên mặt hàng" class="custom-input">
+                                </div>
+                                <div class="custom-item-row">
+                                    <input type="number" id="custom-item-cost" placeholder="Giá nhập" min="0" class="custom-input">
+                                    <input type="number" id="custom-item-price" placeholder="Giá bán" min="0" class="custom-input">
+                                </div>
+                                <div class="custom-item-row">
+                                    <input type="number" id="custom-item-qty" placeholder="Số lượng" min="1" value="1" class="custom-input custom-input-sm">
+                                    <button type="button" class="btn btn-success btn-sm" onclick="Sales.addCustomItem()">
+                                        ➕ Thêm vào giỏ
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="sales-right">
                         <div class="cart-header">
