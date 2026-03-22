@@ -513,6 +513,48 @@ const SheetsAPI = {
     },
 
     /**
+     * Update data in RAW mode (no auto-parsing by Google Sheets)
+     * Use this for values containing commas, special chars, etc.
+     */
+    async updateRaw(range, values) {
+        try {
+            const response = await this.apiCallWithRetry(() =>
+                gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: this.spreadsheetId,
+                    range: range,
+                    valueInputOption: 'RAW',
+                    resource: { values: values }
+                })
+            );
+            return response.result;
+        } catch (error) {
+            console.error('Error updating data (RAW):', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Append data in RAW mode (no auto-parsing by Google Sheets)
+     */
+    async appendRaw(sheetName, values) {
+        try {
+            const response = await this.apiCallWithRetry(() =>
+                gapi.client.sheets.spreadsheets.values.append({
+                    spreadsheetId: this.spreadsheetId,
+                    range: `${sheetName}!A:Z`,
+                    valueInputOption: 'RAW',
+                    insertDataOption: 'INSERT_ROWS',
+                    resource: { values: Array.isArray(values[0]) ? values : [values] }
+                })
+            );
+            return response.result;
+        } catch (error) {
+            console.error('Error appending data (RAW):', error);
+            throw error;
+        }
+    },
+
+    /**
      * Delete a row (with 401 auto-retry)
      */
     async deleteRow(sheetName, rowIndex) {

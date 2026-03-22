@@ -37,23 +37,23 @@ const TelegramNotify = {
             // Save bot token
             const tokenRowIndex = data.findIndex(row => row[0] === 'telegram_bot_token');
             if (tokenRowIndex >= 0) {
-                await SheetsAPI.updateData(
+                await SheetsAPI.updateRaw(
                     `${CONFIG.SHEETS.SETTINGS}!B${tokenRowIndex + 1}`,
                     [[token]]
                 );
             } else {
-                await SheetsAPI.appendData(CONFIG.SHEETS.SETTINGS, ['telegram_bot_token', token]);
+                await SheetsAPI.appendRaw(CONFIG.SHEETS.SETTINGS, ['telegram_bot_token', token]);
             }
 
-            // Save chat ID
+            // Save chat ID (must use RAW to preserve comma-separated IDs)
             const chatIdRowIndex = data.findIndex(row => row[0] === 'telegram_chat_id');
             if (chatIdRowIndex >= 0) {
-                await SheetsAPI.updateData(
+                await SheetsAPI.updateRaw(
                     `${CONFIG.SHEETS.SETTINGS}!B${chatIdRowIndex + 1}`,
                     [[chatId]]
                 );
             } else {
-                await SheetsAPI.appendData(CONFIG.SHEETS.SETTINGS, ['telegram_chat_id', chatId]);
+                await SheetsAPI.appendRaw(CONFIG.SHEETS.SETTINGS, ['telegram_chat_id', chatId]);
             }
 
             this.botToken = token;
