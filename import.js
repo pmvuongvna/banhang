@@ -157,5 +157,64 @@ const SheetImport = {
     updateProgress(percent) {
         const fill = document.getElementById('import-progress-fill');
         if (fill) fill.style.width = Math.min(100, percent) + '%';
+    },
+
+    // ==========================================
+    // Sync Settings (Apps Script URL)
+    // ==========================================
+
+    async showSyncSettings() {
+        const existing = document.getElementById('import-modal');
+        if (existing) existing.remove();
+
+        // Load current script_url from server
+        let currentUrl = '';
+        try {
+            const res = await SheetsAPI._fetch('/api/me');
+            currentUrl = res.data?.script_url || '';
+        } catch (e) {}
+
+        const modal = document.createElement('div');
+        modal.id = 'import-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>⚙️ Đồng bộ dữ liệu → Google Sheet</h3>
+                    <button class="btn-close" onclick="SheetImport.closeModal()">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom:12px;">Nhập URL Apps Script để app tự động ghi dữ liệu vào Sheet mỗi khi có thao tác mới.</p>
+                    <div class="form-group">
+                        <label>URL Apps Script (Web app)</label>
+                        <input type="url" id="sync-script-url" 
+                            placeholder="https://script.google.com/macros/s/.../exec"
+                            value="${currentUrl}">
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-primary" style="flex:1;" onclick="SheetImport.saveSyncSettings()">
+                            💾 Lưu
+                        </button>
+                        <button class="btn btn-secondary" style="flex:1;" onclick="SheetImport.closeModal()">
+                            Hủy
+                        </button>
+                    </div>
+                    ${currentUrl ? '<p style="margin-top:12px; font-size:0.85rem; color:var(--accent-success);">✅ Đang đồng bộ tự động</p>' : '<p style="margin-top:12px; font-size:0.85rem; color:var(--text-secondary);">⚠️ Chưa cấu hình — dữ liệu chỉ lưu trong D1</p>'}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    async saveSyncSettings() {
+        const url = document.getElementById('sync-script-url').value.trim();
+
+        try {
+            await SheetsAPI._fetch('/api/me', 'PUT', { script_url: url });
+            App.showToast(url ? 'Đã lưu! Dữ liệu sẽ tự đồng bộ vào Sheet.' : 'Đã tắt đồng bộ Sheet.', 'success');
+            this.closeModal();
+        } catch (error) {
+            App.showToast('Lỗi lưu: ' + error.message, 'error');
+        }
     }
 };

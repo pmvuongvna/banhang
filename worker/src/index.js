@@ -7,7 +7,51 @@ import { cors } from 'hono/cors';
 import { hashPassword, createJWT, authMiddleware } from './auth.js';
 
 const app = new Hono();
-const JWT_SECRET = 'qlbh-jwt-secret-2026'; // In production, use env var
+const JWT_SECRET = 'qlbh-jwt-secret-2026';
+
+// ==========================================
+// Background Sync: D1 → Google Sheet
+// ==========================================
+
+async function getUserScriptUrl(db, userId) {
+    const user = await db.prepare('SELECT script_url FROM users WHERE id = ?').bind(userId).first();
+    return user?.script_url || null;
+}
+
+async function syncToSheet(scriptUrl, action, body) {
+    if (!scriptUrl) return;
+    try {
+        await fetch(scriptUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, ...body }),
+            redirect: 'follow'
+        });
+    } catch (e) {
+        console.error('Sheet sync error:', e.message);
+    }
+}
+
+function getMonthSheetName(baseName, dateStr) {
+    try {
+        let date;
+        if (dateStr && dateStr.includes('/')) {
+            // dd/mm/yyyy format
+            const parts = dateStr.split(/[/ ,]+/);
+            date = new Date(parts[2], parseInt(parts[1]) - 1, parts[0]);
+        } else if (dateStr) {
+            date = new Date(dateStr);
+        } else {
+            date = new Date();
+        }
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = date.getFullYear();
+        return `${baseName}_${mm}_${yyyy}`;
+    } catch (e) {
+        const now = new Date();
+        return `${baseName}_${String(now.getMonth() + 1).padStart(2, '0')}_${now.getFullYear()}`;
+    }
+}
 
 // CORS for frontend
 app.use('*', cors({
@@ -109,6 +153,13 @@ api.post('/products', async (c) => {
         'INSERT INTO products (user_id, code, name, cost, price, profit, stock, category, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(userId, code, name, cost || 0, price || 0, profit, stock || 0, category || 'Chung', created_at || new Date().toISOString()).run();
 
+    // Background sync to Sheet
+    c.executionCtx.waitUntil((async () => {
+        const scriptUrl = await getUserScriptUrl(db, userId);
+        await syncToSheet(scriptUrl, 'ensureSheet', { sheetName: 'Products', headers: ['Mã SP', 'Tên SP', 'Giá nhập', 'Giá bán', 'Lợi nhuận', 'Tồn kho', 'Ngày tạo', 'Danh mục'] });
+        await syncToSheet(scriptUrl, 'append', { sheetName: 'Products', row: [code, name, cost || 0, price || 0, profit, stock || 0, created_at || '', category || 'Chung'] });
+    })());
+
     return c.json({ success: true, id: result.meta.last_row_id });
 });
 
@@ -190,6 +241,14 @@ api.post('/sales', async (c) => {
         'INSERT INTO sales (user_id, sale_id, datetime, details, total, profit, note) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).bind(userId, sale_id, datetime, details, total || 0, profit || 0, note || '').run();
 
+    // Background sync to Sheet
+    c.executionCtx.waitUntil((async () => {
+        const scriptUrl = await getUserScriptUrl(db, userId);
+        const sheetName = getMonthSheetName('Sales', datetime);
+        await syncToSheet(scriptUrl, 'ensureSheet', { sheetName, headers: ['Mã đơn', 'Thời gian', 'Chi tiết', 'Tổng tiền', 'Lợi nhuận', 'Ghi chú'] });
+        await syncToSheet(scriptUrl, 'append', { sheetName, row: [sale_id, datetime, details, total || 0, profit || 0, note || ''] });
+    })());
+
     return c.json({ success: true });
 });
 
@@ -232,6 +291,14 @@ api.post('/transactions', async (c) => {
     await db.prepare(
         'INSERT INTO transactions (user_id, tx_id, date, type, description, amount, note) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).bind(userId, tx_id, date, type, description || '', amount || 0, note || '').run();
+
+    // Background sync to Sheet
+    c.executionCtx.waitUntil((async () => {
+        const scriptUrl = await getUserScriptUrl(db, userId);
+        const sheetName = getMonthSheetName('Transactions', date);
+        await syncToSheet(scriptUrl, 'ensureSheet', { sheetName, headers: ['Mã GD', 'Ngày', 'Loại', 'Mô tả', 'Số tiền', 'Ghi chú'] });
+        await syncToSheet(scriptUrl, 'append', { sheetName, row: [tx_id, date, type === 'income' ? 'Thu' : 'Chi', description || '', amount || 0, note || ''] });
+    })());
 
     return c.json({ success: true });
 });
@@ -276,6 +343,13 @@ api.post('/debts', async (c) => {
     await db.prepare(
         'INSERT INTO debts (user_id, debt_id, sale_id, customer_name, phone, total, paid, remaining, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(userId, debt_id, sale_id || '', customer_name || '', phone || '', total || 0, paid || 0, remaining || 0, status || 'Còn nợ', created_at || '', updated_at || '').run();
+
+    // Background sync to Sheet
+    c.executionCtx.waitUntil((async () => {
+        const scriptUrl = await getUserScriptUrl(db, userId);
+        await syncToSheet(scriptUrl, 'ensureSheet', { sheetName: 'Debts', headers: ['Mã nợ', 'Mã đơn', 'Khách hàng', 'SĐT', 'Tổng nợ', 'Đã trả', 'Còn lại', 'Ngày tạo', 'Ngày cập nhật', 'Trạng thái'] });
+        await syncToSheet(scriptUrl, 'append', { sheetName: 'Debts', row: [debt_id, sale_id || '', customer_name || '', phone || '', total || 0, paid || 0, remaining || 0, created_at || '', updated_at || '', status || 'Còn nợ'] });
+    })());
 
     return c.json({ success: true });
 });
@@ -335,20 +409,21 @@ api.put('/settings', async (c) => {
 api.get('/me', async (c) => {
     const userId = c.get('userId');
     const db = c.env.DB;
-    const user = await db.prepare('SELECT id, email, store_name FROM users WHERE id = ?').bind(userId).first();
+    const user = await db.prepare('SELECT id, email, store_name, script_url FROM users WHERE id = ?').bind(userId).first();
     return c.json({ data: user });
 });
 
 api.put('/me', async (c) => {
     const userId = c.get('userId');
     const db = c.env.DB;
-    const { store_name } = await c.req.json();
+    const { store_name, script_url } = await c.req.json();
 
     if (store_name) {
         await db.prepare('UPDATE users SET store_name = ? WHERE id = ?').bind(store_name, userId).run();
-        await db.prepare(
-            'INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?) ON CONFLICT(user_id, key) DO UPDATE SET value = ?'
-        ).bind(userId, 'store_name', store_name, store_name).run();
+    }
+
+    if (script_url !== undefined) {
+        await db.prepare('UPDATE users SET script_url = ? WHERE id = ?').bind(script_url, userId).run();
     }
 
     return c.json({ success: true });
