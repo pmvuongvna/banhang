@@ -248,6 +248,89 @@ body {
     margin-bottom: 12px;
 }
 
+/* Connect screen (Apps Script URL) */
+.setup-section {
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    padding: 24px;
+    margin: 24px 0 16px 0;
+    border: 1px solid var(--border-color);
+}
+
+.setup-section h3 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.setup-section .note {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.btn-full {
+    width: 100%;
+    padding: 14px;
+    font-size: 1rem;
+}
+
+.login-logo {
+    font-size: 3rem;
+    margin-bottom: 8px;
+}
+
+.login-card h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.login-card .subtitle {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin-bottom: 0;
+}
+
+/* Setup help accordion */
+.setup-help {
+    margin-top: 16px;
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.setup-help summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-primary);
+    user-select: none;
+}
+
+.setup-help summary:hover {
+    background: var(--bg-tertiary);
+}
+
+.setup-help ol {
+    padding: 0 20px 16px 36px;
+    margin: 0;
+}
+
+.setup-help li {
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.setup-help .note {
+    padding: 0 20px 16px 20px;
+    font-size: 0.85rem;
+}
+
 .setup-divider {
     display: flex;
     align-items: center;
@@ -1579,67 +1662,300 @@ body {
    Responsive Design
    ========================================== */
 @media (max-width: 768px) {
+    /* --- Navigation: Bottom bar on mobile --- */
     .app-nav {
-        justify-content: flex-start;
-        padding: 0 12px;
-    }
-
-    .nav-text {
-        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 900;
+        height: 60px;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border-color);
+        border-bottom: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        padding: 0 4px;
+        box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
     }
 
     .nav-btn {
-        padding: 10px 14px;
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px 8px;
+        font-size: 0.65rem;
+        min-width: 0;
+        flex: 1;
     }
 
-    .sales-container {
-        grid-template-columns: 1fr;
-        height: auto;
+    .nav-text {
+        display: block;
+        font-size: 0.6rem;
+        line-height: 1;
     }
 
-    .sales-right {
-        min-height: 400px;
+    .nav-icon {
+        font-size: 1.2rem;
     }
 
-    .transactions-summary {
-        grid-template-columns: 1fr;
+    /* Padding bottom for content to not be hidden by nav */
+    .app-main {
+        padding: 16px 12px 80px 12px;
     }
 
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-
-    .data-table {
-        font-size: 0.85rem;
-    }
-
-    .data-table th,
-    .data-table td {
-        padding: 10px 12px;
+    /* --- Header --- */
+    .app-header {
+        padding: 0 12px;
     }
 
     .header-left .store-name {
         display: none;
     }
-}
 
-@media (max-width: 480px) {
-
-    .login-card,
-    .setup-card {
-        padding: 32px 24px;
+    .header-right {
+        gap: 4px;
     }
 
-    .app-main {
-        padding: 16px;
+    .month-selector {
+        max-width: 120px;
+        padding: 6px 8px;
+        font-size: 0.8rem;
+    }
+
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+
+    /* Hide less-used header buttons on mobile */
+    #btn-migrate {
+        display: none;
+    }
+
+    /* --- Tab headers --- */
+    .tab-header {
+        margin-bottom: 16px;
+        gap: 10px;
+    }
+
+    .tab-header h2 {
+        font-size: 1.2rem;
+    }
+
+    /* --- Stats grid --- */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
     }
 
     .stat-card {
-        padding: 16px;
+        padding: 14px;
+        gap: 10px;
+    }
+
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.1rem;
     }
 
     .stat-value {
+        font-size: 1.1rem;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+    }
+
+    /* --- Tables: horizontal scroll with data labels --- */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -12px;
+        padding: 0 12px;
+    }
+
+    .data-table {
+        font-size: 0.8rem;
+        min-width: 600px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 10px 8px;
+        white-space: nowrap;
+    }
+
+    /* --- Action buttons: larger touch targets --- */
+    .action-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+
+    .action-btns {
+        gap: 6px;
+    }
+
+    /* --- Sales layout --- */
+    .sales-container {
+        grid-template-columns: 1fr;
+        height: auto;
+        gap: 16px;
+    }
+
+    .sales-right {
+        min-height: 350px;
+    }
+
+    .sales-left {
+        max-height: none;
+    }
+
+    /* --- Search bar full width on mobile --- */
+    .search-bar input {
+        max-width: 100%;
+    }
+
+    /* --- Cart --- */
+    .cart-item {
+        padding: 10px;
+    }
+
+    .cart-item-name {
+        font-size: 0.85rem;
+    }
+
+    .btn-qty {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+
+    .cart-footer {
+        padding: 12px;
+    }
+
+    .cart-total {
         font-size: 1.2rem;
+    }
+
+    /* --- Transactions summary --- */
+    .transactions-summary {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    /* --- Form rows --- */
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    /* --- Modals --- */
+    .modal {
+        padding: 12px;
+        align-items: flex-end;
+    }
+
+    .modal-content {
+        max-height: 85vh;
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
+    }
+
+    /* --- Dashboard charts --- */
+    .dashboard-sections {
+        grid-template-columns: 1fr;
+    }
+
+    /* --- Custom item form --- */
+    .custom-item-form {
+        padding: 10px;
+    }
+
+    .custom-input {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+    }
+
+    /* --- Debt section --- */
+    .debt-checkout-option {
+        margin-bottom: 12px;
+    }
+
+    /* --- Search bar with filter --- */
+    .search-bar-with-filter {
+        flex-direction: column;
+    }
+
+    .search-bar-with-filter input,
+    .category-filter-select {
+        width: 100%;
+    }
+
+    /* --- Dashboard charts grid --- */
+    .dashboard-charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-card,
+    .setup-card {
+        padding: 24px 16px;
+    }
+
+    .app-main {
+        padding: 12px 8px 76px 8px;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .stat-card {
+        padding: 12px;
+    }
+
+    .stat-value {
+        font-size: 1rem;
+    }
+
+    .tab-header h2 {
+        font-size: 1rem;
+    }
+
+    /* Sales history table even more compact */
+    .data-table {
+        font-size: 0.75rem;
+        min-width: 500px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 8px 6px;
+    }
+
+    /* Charts smaller */
+    .dashboard-charts-grid {
+        gap: 12px;
+    }
+
+    .chart-small {
+        height: 220px !important;
+        min-height: 220px;
+    }
+
+    /* Nav bottom bar tighter */
+    .nav-btn {
+        padding: 4px 4px;
+        font-size: 0.58rem;
+    }
+
+    .nav-icon {
+        font-size: 1.1rem;
     }
 }
 
@@ -2167,4 +2483,16 @@ body {
 
 .search-no-result a:hover {
     color: var(--accent-primary-dark, #4f46e5);
+}
+
+/* ==========================================
+   PWA Install Button
+   ========================================== */
+.btn-install {
+    animation: pulse-install 2s ease-in-out infinite;
+}
+
+@keyframes pulse-install {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
 }

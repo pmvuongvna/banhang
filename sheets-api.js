@@ -1,470 +1,143 @@
 /**
- * QLBH - Google Sheets API Module
- * Handles all interactions with Google Sheets
+ * QLBH - Sheets API Module (Apps Script Backend)
+ * Replaces direct Google API calls with fetch() to Apps Script Web App URL
+ * No OAuth login required - Apps Script runs as the Sheet owner
  */
 
 const SheetsAPI = {
-    tokenClient: null,
-    accessToken: null,
-    spreadsheetId: null,
+    scriptUrl: null,
+    spreadsheetId: null, // Keep for compatibility, but not used in API calls
     isInitialized: false,
-    tokenExpiresAt: null,
-    refreshTimer: null,
-    wakeDetectionTimer: null,
-    lastHeartbeat: Date.now(),
-    onSignInCallback: null,
+    _sheetIdsCache: null,
+    _sheetIdsCacheTime: 0,
 
     /**
-     * Initialize Google API
+     * Initialize - load saved script URL from localStorage
      */
     async init() {
-        return new Promise((resolve, reject) => {
-            gapi.load('client', async () => {
-                try {
-                    await gapi.client.init({
-                        apiKey: CONFIG.API_KEY,
-                        discoveryDocs: CONFIG.DISCOVERY_DOCS
-                    });
-
-                    // Check for saved spreadsheet ID
-                    this.spreadsheetId = localStorage.getItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID);
-
-                    // Restore saved token if available
-                    this.restoreToken();
-
-                    this.isInitialized = true;
-                    resolve();
-                } catch (error) {
-                    console.error('Error initializing GAPI:', error);
-                    reject(error);
-                }
-            });
-        });
+        this.scriptUrl = localStorage.getItem('qlbh_script_url');
+        this.spreadsheetId = localStorage.getItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID) || 'apps-script';
+        this.isInitialized = true;
+        console.log('[SheetsAPI] Initialized (Apps Script mode)');
     },
 
     /**
-     * Save token to localStorage for persistence
+     * Save the Apps Script URL
      */
-    saveToken(accessToken, expiresIn) {
-        this.accessToken = accessToken;
-        // Calculate expiry time (expiresIn is in seconds)
-        const expiresAt = Date.now() + (expiresIn * 1000);
-        this.tokenExpiresAt = expiresAt;
-
-        localStorage.setItem('qlbh_access_token', accessToken);
-        localStorage.setItem('qlbh_token_expires', expiresAt.toString());
-
-        // Schedule auto-refresh
-        this.scheduleTokenRefresh(expiresIn);
+    setScriptUrl(url) {
+        // Clean up URL - remove trailing slash
+        url = url.trim().replace(/\/+$/, '');
+        this.scriptUrl = url;
+        localStorage.setItem('qlbh_script_url', url);
+        // Also set a pseudo spreadsheet ID so other parts of the app think it's connected
+        this.spreadsheetId = 'apps-script-connected';
+        localStorage.setItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID, this.spreadsheetId);
     },
 
     /**
-     * Schedule automatic token refresh before expiry
-     * Refreshes 5 minutes before token expires
+     * Check if script URL is configured
      */
-    scheduleTokenRefresh(expiresInSeconds) {
-        // Clear any existing timer
-        if (this.refreshTimer) {
-            clearTimeout(this.refreshTimer);
-            this.refreshTimer = null;
-        }
-
-        // Refresh 5 minutes (300s) before expiry, minimum 30 seconds
-        const refreshInMs = Math.max((expiresInSeconds - 300) * 1000, 30000);
-        console.log(`Token refresh scheduled in ${Math.round(refreshInMs / 60000)} minutes`);
-
-        this.refreshTimer = setTimeout(() => {
-            console.log('Auto-refreshing token...');
-            this.silentRefresh();
-        }, refreshInMs);
+    hasValidToken() {
+        return !!this.scriptUrl;
     },
 
     /**
-     * Silently refresh token without user interaction
+     * Check if the Apps Script URL is reachable
      */
-    silentRefresh() {
-        if (this.tokenClient) {
-            try {
-                // prompt: '' means no user interaction, silent refresh
-                this.tokenClient.requestAccessToken({ prompt: '' });
-            } catch (error) {
-                console.error('Silent token refresh failed:', error);
-            }
+    async checkSpreadsheet() {
+        if (!this.scriptUrl) return false;
+        try {
+            const result = await this._get('ping');
+            return result && result.status === 'ok';
+        } catch (error) {
+            console.error('[SheetsAPI] Ping failed:', error);
+            return false;
         }
     },
 
     /**
-     * Ensure token is valid before making API calls
-     * If expired or about to expire, refresh silently
+     * Get store name from the Sheet
      */
-    async ensureValidToken() {
-        if (!this.accessToken) return false;
-
-        // If token expires in less than 2 minutes, refresh now
-        if (Date.now() > this.tokenExpiresAt - 120000) {
-            console.log('Token expiring soon, refreshing...');
-            return new Promise((resolve) => {
-                const originalCallback = this.onSignInCallback;
-                // Temporarily override callback to resolve promise
-                const tempCallback = this.tokenClient._callback;
-
-                this.tokenClient.requestAccessToken({ prompt: '' });
-
-                // Give it 5 seconds max to refresh
-                setTimeout(() => {
-                    resolve(this.hasValidToken());
-                }, 5000);
-            });
+    async getStoreName() {
+        try {
+            const result = await this._get('getStoreName');
+            const name = result?.name || '';
+            // Strip "QLBH - " prefix if present
+            return name.replace(/^QLBH\s*-\s*/, '') || 'Cửa hàng';
+        } catch (error) {
+            return localStorage.getItem(CONFIG.STORAGE_KEYS.STORE_NAME) || 'Cửa hàng';
         }
-
-        return true;
     },
 
     /**
-     * Execute an API call with automatic 401 retry
-     * If the call fails with 401, refresh token and retry once
+     * "Sign in" — just verify the URL works
+     * For compatibility with existing code that calls signIn()
+     */
+    signIn() {
+        // In Apps Script mode, there's no OAuth sign in
+        // The setup screen handles URL input
+        console.log('[SheetsAPI] signIn() called — using Apps Script mode, no OAuth needed');
+    },
+
+    /**
+     * "Sign out" — clear saved URL
+     */
+    signOut() {
+        this.scriptUrl = null;
+        this.spreadsheetId = null;
+        localStorage.removeItem('qlbh_script_url');
+        localStorage.removeItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID);
+        localStorage.removeItem(CONFIG.STORAGE_KEYS.STORE_NAME);
+    },
+
+    /**
+     * Get user info — not available in Apps Script mode
+     * Return a dummy object
+     */
+    async getUserInfo() {
+        return {
+            name: localStorage.getItem(CONFIG.STORAGE_KEYS.STORE_NAME) || 'QLBH User',
+            picture: '',
+            email: ''
+        };
+    },
+
+    /**
+     * These methods are no-ops in Apps Script mode:
+     */
+    initTokenClient(callback) { /* no-op */ },
+    startTokenGuard() { /* no-op */ },
+    saveToken() { /* no-op */ },
+    restoreToken() { return false; },
+    clearToken() { /* no-op */ },
+    scheduleTokenRefresh() { /* no-op */ },
+    silentRefresh() { /* no-op */ },
+    async ensureValidToken() { return true; },
+
+    /**
+     * API call with retry - simplified for Apps Script
      */
     async apiCallWithRetry(apiCall) {
         try {
             return await apiCall();
         } catch (error) {
-            // Check for 401 Unauthorized
-            const status = error?.status || error?.result?.error?.code;
-            if (status === 401) {
-                console.log('[Token] 401 detected, attempting refresh...');
-                const refreshed = await this.ensureValidToken();
-                if (refreshed) {
-                    console.log('[Token] Refresh successful, retrying API call...');
-                    return await apiCall(); // Retry once
-                } else {
-                    console.log('[Token] Refresh failed, user needs to re-login');
-                }
-            }
-            throw error;
+            // Retry once
+            console.warn('[SheetsAPI] First attempt failed, retrying...', error);
+            return await apiCall();
         }
     },
 
-    /**
-     * Start token guard: visibility change + wake detection
-     * Call this after successful sign-in
-     */
-    startTokenGuard() {
-        // 1. Visibility change: refresh when tab regains focus
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && this.accessToken) {
-                const timeUntilExpiry = this.tokenExpiresAt - Date.now();
-                if (timeUntilExpiry < 120000) { // Less than 2 min
-                    console.log('[TokenGuard] Tab focused, token expiring soon, refreshing...');
-                    this.silentRefresh();
-                } else if (timeUntilExpiry < 300000) { // Less than 5 min
-                    console.log('[TokenGuard] Tab focused, token expires in <5 min');
-                }
-            }
-        });
-
-        // 2. Wake detection: check every 60s for sleep/wake gaps
-        this.lastHeartbeat = Date.now();
-        if (this.wakeDetectionTimer) clearInterval(this.wakeDetectionTimer);
-        this.wakeDetectionTimer = setInterval(() => {
-            const now = Date.now();
-            const elapsed = now - this.lastHeartbeat;
-            this.lastHeartbeat = now;
-
-            // If >90s elapsed (should be ~60s), device likely woke from sleep
-            if (elapsed > 90000 && this.accessToken) {
-                console.log(`[TokenGuard] Wake detected (${Math.round(elapsed/1000)}s gap)`);
-                if (now > this.tokenExpiresAt - 120000) {
-                    console.log('[TokenGuard] Token expired/expiring after wake, refreshing...');
-                    this.silentRefresh();
-                }
-            }
-        }, 60000);
-
-        console.log('[TokenGuard] Token guard active (visibility + wake detection)');
-    },
+    // ==========================================
+    // Core Data Operations
+    // ==========================================
 
     /**
-     * Restore token from localStorage
-     */
-    restoreToken() {
-        const savedToken = localStorage.getItem('qlbh_access_token');
-        const expiresAt = localStorage.getItem('qlbh_token_expires');
-
-        if (savedToken && expiresAt) {
-            const expiryTime = parseInt(expiresAt);
-            // Check if token is still valid (with 2 minute buffer)
-            if (Date.now() < expiryTime - 120000) {
-                this.accessToken = savedToken;
-                this.tokenExpiresAt = expiryTime;
-                // Set token for gapi client
-                gapi.client.setToken({ access_token: savedToken });
-
-                // Schedule refresh for remaining time
-                const remainingSeconds = Math.floor((expiryTime - Date.now()) / 1000);
-                this.scheduleTokenRefresh(remainingSeconds);
-                return true;
-            } else {
-                // Token expired, clear it
-                this.clearToken();
-            }
-        }
-        return false;
-    },
-
-    /**
-     * Check if user has valid token
-     */
-    hasValidToken() {
-        if (!this.accessToken || !this.tokenExpiresAt) return false;
-        // Check with 1 minute buffer
-        return Date.now() < this.tokenExpiresAt - 60000;
-    },
-
-    /**
-     * Clear saved token
-     */
-    clearToken() {
-        localStorage.removeItem('qlbh_access_token');
-        localStorage.removeItem('qlbh_token_expires');
-        this.accessToken = null;
-        this.tokenExpiresAt = null;
-        if (this.refreshTimer) {
-            clearTimeout(this.refreshTimer);
-            this.refreshTimer = null;
-        }
-    },
-
-    /**
-     * Initialize Token Client for OAuth
-     */
-    initTokenClient(callback) {
-        this.onSignInCallback = callback;
-        this.tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CONFIG.CLIENT_ID,
-            scope: CONFIG.SCOPES,
-            callback: (response) => {
-                if (response.error) {
-                    console.error('Token error:', response);
-                    return;
-                }
-                // Save token with expiry (default 1 hour = 3600 seconds)
-                const expiresIn = response.expires_in || 3600;
-                this.saveToken(response.access_token, expiresIn);
-                console.log(`Token refreshed, valid for ${Math.round(expiresIn / 60)} minutes`);
-                callback(response);
-            }
-        });
-    },
-
-    /**
-     * Request access token (sign in)
-     */
-    signIn() {
-        if (this.tokenClient) {
-            if (this.accessToken) {
-                // Token exists but may be expired, request new one
-                this.tokenClient.requestAccessToken({ prompt: '' });
-            } else {
-                // First time, use select_account
-                this.tokenClient.requestAccessToken({ prompt: 'select_account' });
-            }
-        }
-    },
-
-    /**
-     * Sign out
-     */
-    signOut() {
-        if (this.accessToken) {
-            google.accounts.oauth2.revoke(this.accessToken);
-            this.clearToken();
-        }
-    },
-
-    /**
-     * Get user profile info
-     */
-    async getUserInfo() {
-        try {
-            const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`
-                }
-            });
-            return await response.json();
-        } catch (error) {
-            console.error('Error getting user info:', error);
-            return null;
-        }
-    },
-
-    /**
-     * Create new spreadsheet with predefined structure
-     */
-    async createSpreadsheet(storeName) {
-        try {
-            // Create spreadsheet
-            const response = await gapi.client.sheets.spreadsheets.create({
-                properties: {
-                    title: `QLBH - ${storeName}`
-                },
-                sheets: [
-                    {
-                        properties: {
-                            title: CONFIG.SHEETS.PRODUCTS,
-                            gridProperties: { frozenRowCount: 1 }
-                        }
-                    },
-                    {
-                        properties: {
-                            title: CONFIG.SHEETS.SALES,
-                            gridProperties: { frozenRowCount: 1 }
-                        }
-                    },
-                    {
-                        properties: {
-                            title: CONFIG.SHEETS.TRANSACTIONS,
-                            gridProperties: { frozenRowCount: 1 }
-                        }
-                    },
-                    {
-                        properties: {
-                            title: CONFIG.SHEETS.DEBTS,
-                            gridProperties: { frozenRowCount: 1 }
-                        }
-                    },
-                    {
-                        properties: {
-                            title: CONFIG.SHEETS.SETTINGS,
-                            gridProperties: { frozenRowCount: 1 }
-                        }
-                    }
-                ]
-            });
-
-            this.spreadsheetId = response.result.spreadsheetId;
-            localStorage.setItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID, this.spreadsheetId);
-            localStorage.setItem(CONFIG.STORAGE_KEYS.STORE_NAME, storeName);
-
-            // Initialize headers for each sheet
-            await this.initializeHeaders(storeName);
-
-            return this.spreadsheetId;
-        } catch (error) {
-            console.error('Error creating spreadsheet:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Initialize headers for all sheets
-     */
-    async initializeHeaders(storeName) {
-        const requests = [
-            // Products headers (includes Category column H)
-            {
-                range: `${CONFIG.SHEETS.PRODUCTS}!A1:H1`,
-                values: [['Mã SP', 'Tên SP', 'Giá nhập', 'Giá bán', 'Lãi', 'Tồn kho', 'Ngày tạo', 'Danh mục']]
-            },
-            // Sales headers
-            {
-                range: `${CONFIG.SHEETS.SALES}!A1:F1`,
-                values: [['Mã đơn', 'Ngày giờ', 'Chi tiết', 'Tổng tiền', 'Lợi nhuận', 'Ghi chú']]
-            },
-            // Transactions headers
-            {
-                range: `${CONFIG.SHEETS.TRANSACTIONS}!A1:F1`,
-                values: [['ID', 'Ngày', 'Loại', 'Mô tả', 'Số tiền', 'Ghi chú']]
-            },
-            // Debts headers
-            {
-                range: `${CONFIG.SHEETS.DEBTS}!A1:J1`,
-                values: [['Mã nợ', 'Mã đơn', 'Tên khách', 'SĐT', 'Tổng tiền', 'Đã trả', 'Còn nợ', 'Ngày tạo', 'Ngày cập nhật', 'Trạng thái']]
-            },
-            // Settings data
-            {
-                range: `${CONFIG.SHEETS.SETTINGS}!A1:B4`,
-                values: [
-                    ['Key', 'Value'],
-                    ['store_name', storeName],
-                    ['currency', 'VND'],
-                    ['created_at', new Date().toISOString()]
-                ]
-            }
-        ];
-
-        for (const req of requests) {
-            await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: this.spreadsheetId,
-                range: req.range,
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: req.values }
-            });
-        }
-
-        // Format headers (bold, background color)
-        await this.formatHeaders();
-    },
-
-    /**
-     * Format headers with styling
-     */
-    async formatHeaders() {
-        const sheetIds = await this.getSheetIds();
-
-        const requests = Object.values(sheetIds).map(sheetId => ({
-            repeatCell: {
-                range: {
-                    sheetId: sheetId,
-                    startRowIndex: 0,
-                    endRowIndex: 1
-                },
-                cell: {
-                    userEnteredFormat: {
-                        backgroundColor: { red: 0.2, green: 0.2, blue: 0.3 },
-                        textFormat: {
-                            bold: true,
-                            foregroundColor: { red: 1, green: 1, blue: 1 }
-                        }
-                    }
-                },
-                fields: 'userEnteredFormat(backgroundColor,textFormat)'
-            }
-        }));
-
-        await gapi.client.sheets.spreadsheets.batchUpdate({
-            spreadsheetId: this.spreadsheetId,
-            resource: { requests }
-        });
-    },
-
-    /**
-     * Get sheet IDs
-     */
-    async getSheetIds() {
-        const response = await gapi.client.sheets.spreadsheets.get({
-            spreadsheetId: this.spreadsheetId
-        });
-
-        const sheets = {};
-        response.result.sheets.forEach(sheet => {
-            sheets[sheet.properties.title] = sheet.properties.sheetId;
-        });
-        return sheets;
-    },
-
-    /**
-     * Read data from a range (with 401 auto-retry)
+     * Read data from a range
      */
     async readData(range) {
         try {
-            const response = await this.apiCallWithRetry(() =>
-                gapi.client.sheets.spreadsheets.values.get({
-                    spreadsheetId: this.spreadsheetId,
-                    range: range
-                })
-            );
-            return response.result.values || [];
+            const result = await this._get('read', { range });
+            return result?.data || [];
         } catch (error) {
             console.error('Error reading data:', error);
             return [];
@@ -472,20 +145,16 @@ const SheetsAPI = {
     },
 
     /**
-     * Append data to a sheet (with 401 auto-retry)
+     * Append data to a sheet
      */
     async appendData(sheetName, values) {
         try {
-            const response = await this.apiCallWithRetry(() =>
-                gapi.client.sheets.spreadsheets.values.append({
-                    spreadsheetId: this.spreadsheetId,
-                    range: `${sheetName}!A:Z`,
-                    valueInputOption: 'USER_ENTERED',
-                    insertDataOption: 'INSERT_ROWS',
-                    resource: { values: Array.isArray(values[0]) ? values : [values] }
-                })
-            );
-            return response.result;
+            const row = Array.isArray(values[0]) ? values[0] : values;
+            return await this._post({
+                action: 'append',
+                sheetName: sheetName,
+                row: row
+            });
         } catch (error) {
             console.error('Error appending data:', error);
             throw error;
@@ -493,19 +162,15 @@ const SheetsAPI = {
     },
 
     /**
-     * Update data in a specific range (with 401 auto-retry)
+     * Update data in a specific range
      */
     async updateData(range, values) {
         try {
-            const response = await this.apiCallWithRetry(() =>
-                gapi.client.sheets.spreadsheets.values.update({
-                    spreadsheetId: this.spreadsheetId,
-                    range: range,
-                    valueInputOption: 'USER_ENTERED',
-                    resource: { values: values }
-                })
-            );
-            return response.result;
+            return await this._post({
+                action: 'update',
+                range: range,
+                values: values
+            });
         } catch (error) {
             console.error('Error updating data:', error);
             throw error;
@@ -513,20 +178,15 @@ const SheetsAPI = {
     },
 
     /**
-     * Update data in RAW mode (no auto-parsing by Google Sheets)
-     * Use this for values containing commas, special chars, etc.
+     * Update data in RAW mode (for values with commas, etc.)
      */
     async updateRaw(range, values) {
         try {
-            const response = await this.apiCallWithRetry(() =>
-                gapi.client.sheets.spreadsheets.values.update({
-                    spreadsheetId: this.spreadsheetId,
-                    range: range,
-                    valueInputOption: 'RAW',
-                    resource: { values: values }
-                })
-            );
-            return response.result;
+            return await this._post({
+                action: 'updateRaw',
+                range: range,
+                values: values
+            });
         } catch (error) {
             console.error('Error updating data (RAW):', error);
             throw error;
@@ -534,20 +194,16 @@ const SheetsAPI = {
     },
 
     /**
-     * Append data in RAW mode (no auto-parsing by Google Sheets)
+     * Append data in RAW mode
      */
     async appendRaw(sheetName, values) {
         try {
-            const response = await this.apiCallWithRetry(() =>
-                gapi.client.sheets.spreadsheets.values.append({
-                    spreadsheetId: this.spreadsheetId,
-                    range: `${sheetName}!A:Z`,
-                    valueInputOption: 'RAW',
-                    insertDataOption: 'INSERT_ROWS',
-                    resource: { values: Array.isArray(values[0]) ? values : [values] }
-                })
-            );
-            return response.result;
+            const row = Array.isArray(values[0]) ? values[0] : values;
+            return await this._post({
+                action: 'appendRaw',
+                sheetName: sheetName,
+                row: row
+            });
         } catch (error) {
             console.error('Error appending data (RAW):', error);
             throw error;
@@ -555,31 +211,15 @@ const SheetsAPI = {
     },
 
     /**
-     * Delete a row (with 401 auto-retry)
+     * Delete a row by index (1-based as passed from existing code)
      */
     async deleteRow(sheetName, rowIndex) {
         try {
-            const sheetIds = await this.getSheetIds();
-            const sheetId = sheetIds[sheetName];
-
-            await this.apiCallWithRetry(() =>
-                gapi.client.sheets.spreadsheets.batchUpdate({
-                    spreadsheetId: this.spreadsheetId,
-                    resource: {
-                        requests: [{
-                            deleteDimension: {
-                                range: {
-                                    sheetId: sheetId,
-                                    dimension: 'ROWS',
-                                    startIndex: rowIndex,
-                                    endIndex: rowIndex + 1
-                                }
-                            }
-                        }]
-                    }
-                })
-            );
-            return true;
+            return await this._post({
+                action: 'deleteRow',
+                sheetName: sheetName,
+                rowIndex: rowIndex
+            });
         } catch (error) {
             console.error('Error deleting row:', error);
             throw error;
@@ -587,81 +227,52 @@ const SheetsAPI = {
     },
 
     /**
-     * Check if spreadsheet exists and is accessible
+     * Get sheet IDs (cached for 30 seconds)
      */
-    async checkSpreadsheet() {
-        if (!this.spreadsheetId) return false;
+    async getSheetIds() {
+        const now = Date.now();
+        if (this._sheetIdsCache && (now - this._sheetIdsCacheTime) < 30000) {
+            return this._sheetIdsCache;
+        }
 
         try {
-            await gapi.client.sheets.spreadsheets.get({
-                spreadsheetId: this.spreadsheetId
+            const result = await this._get('getSheetIds');
+            this._sheetIdsCache = result?.sheetIds || {};
+            this._sheetIdsCacheTime = now;
+            return this._sheetIdsCache;
+        } catch (error) {
+            console.error('Error getting sheet IDs:', error);
+            return this._sheetIdsCache || {};
+        }
+    },
+
+    /**
+     * Ensure a sheet exists, create if not
+     */
+    async ensureSheetExists(sheetName, headers) {
+        // Check local cache first
+        const sheetIds = await this.getSheetIds();
+        if (sheetIds[sheetName]) return true;
+
+        try {
+            const result = await this._post({
+                action: 'ensureSheet',
+                sheetName: sheetName,
+                headers: headers
             });
+
+            // Invalidate cache
+            this._sheetIdsCache = null;
             return true;
         } catch (error) {
-            // Spreadsheet not found or not accessible
-            localStorage.removeItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID);
-            this.spreadsheetId = null;
-            return false;
-        }
-    },
-
-    /**
-     * Get store name from settings
-     */
-    async getStoreName() {
-        try {
-            const data = await this.readData(`${CONFIG.SHEETS.SETTINGS}!A:B`);
-            const row = data.find(r => r[0] === 'store_name');
-            return row ? row[1] : 'Cửa hàng';
-        } catch (error) {
-            return localStorage.getItem(CONFIG.STORAGE_KEYS.STORE_NAME) || 'Cửa hàng';
-        }
-    },
-
-    /**
-     * Link an existing spreadsheet by ID
-     * Validates the spreadsheet structure before linking
-     */
-    async linkExistingSheet(sheetId) {
-        try {
-            // Try to access the spreadsheet
-            const response = await gapi.client.sheets.spreadsheets.get({
-                spreadsheetId: sheetId
-            });
-
-            // Check if it has the required sheets
-            const sheets = response.result.sheets.map(s => s.properties.title);
-            // Relaxed check: Only Products and Settings are strictly required initially
-            // Sales and Transactions can be created dynamically
-            const requiredSheets = [CONFIG.SHEETS.PRODUCTS, CONFIG.SHEETS.SETTINGS];
-            const missingSheets = requiredSheets.filter(s => !sheets.includes(s));
-
-            if (missingSheets.length > 0) {
-                throw new Error(`Sheet không hợp lệ. Thiếu các sheet: ${missingSheets.join(', ')}`);
-            }
-
-            // Save the sheet ID
-            this.spreadsheetId = sheetId;
-            localStorage.setItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID, sheetId);
-
-            // Try to get store name from settings
-            const storeName = await this.getStoreName();
-            localStorage.setItem(CONFIG.STORAGE_KEYS.STORE_NAME, storeName);
-
-            return { success: true, storeName };
-        } catch (error) {
-            console.error('Error linking spreadsheet:', error);
-            if (error.status === 404) {
-                throw new Error('Không tìm thấy Sheet với ID này. Vui lòng kiểm tra lại.');
-            } else if (error.status === 403) {
-                throw new Error('Bạn không có quyền truy cập Sheet này.');
-            }
+            console.error(`Error creating sheet ${sheetName}:`, error);
             throw error;
         }
     },
 
     /**
      * Get sheet name with month suffix (e.g. Sales_02_2026)
+     * Pure utility function — no API call needed
      */
     getMonthSheetName(baseName, date = new Date()) {
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -670,69 +281,84 @@ const SheetsAPI = {
     },
 
     /**
-     * Check if a sheet exists, if not create it with headers
+     * Create spreadsheet — in Apps Script mode, the Sheet already exists
+     * This is called from the setup flow, so we just verify connection
      */
-    async ensureSheetExists(sheetName, headers) {
-        const sheetIds = await this.getSheetIds();
-        if (sheetIds[sheetName]) return true;
+    async createSpreadsheet(storeName) {
+        // In Apps Script mode, user already has a Sheet
+        // Just save the store name
+        localStorage.setItem(CONFIG.STORAGE_KEYS.STORE_NAME, storeName);
+        return 'apps-script-connected';
+    },
 
+    /**
+     * Link existing sheet — in Apps Script mode, user provides the script URL
+     * Called when user enters URL in setup screen
+     */
+    async linkExistingSheet(scriptUrl) {
         try {
-            // Create new sheet
-            await gapi.client.sheets.spreadsheets.batchUpdate({
-                spreadsheetId: this.spreadsheetId,
-                resource: {
-                    requests: [{
-                        addSheet: {
-                            properties: {
-                                title: sheetName,
-                                gridProperties: { frozenRowCount: 1 }
-                            }
-                        }
-                    }]
-                }
-            });
+            this.setScriptUrl(scriptUrl);
+            const isOk = await this.checkSpreadsheet();
+            if (!isOk) {
+                this.signOut();
+                throw new Error('Không thể kết nối. Kiểm tra lại URL Apps Script.');
+            }
 
-            // Add headers
-            await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: this.spreadsheetId,
-                range: `${sheetName}!A1`,
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: [headers] }
-            });
+            const storeName = await this.getStoreName();
+            localStorage.setItem(CONFIG.STORAGE_KEYS.STORE_NAME, storeName);
 
-            // Format headers
-            const newSheetIds = await this.getSheetIds();
-            const newSheetId = newSheetIds[sheetName];
-
-            await gapi.client.sheets.spreadsheets.batchUpdate({
-                spreadsheetId: this.spreadsheetId,
-                resource: {
-                    requests: [{
-                        repeatCell: {
-                            range: {
-                                sheetId: newSheetId,
-                                startRowIndex: 0,
-                                endRowIndex: 1
-                            },
-                            cell: {
-                                userEnteredFormat: {
-                                    backgroundColor: { red: 0.2, green: 0.2, blue: 0.3 },
-                                    textFormat: {
-                                        bold: true,
-                                        foregroundColor: { red: 1, green: 1, blue: 1 }
-                                    }
-                                }
-                            },
-                            fields: 'userEnteredFormat(backgroundColor,textFormat)'
-                        }
-                    }]
-                }
-            });
-
-            return true;
+            return { success: true, storeName };
         } catch (error) {
-            console.error(`Error creating sheet ${sheetName}:`, error);
+            console.error('Error linking via Apps Script:', error);
             throw error;
         }
+    },
+
+    // ==========================================
+    // Internal HTTP helpers
+    // ==========================================
+
+    /**
+     * GET request to Apps Script
+     */
+    async _get(action, params = {}) {
+        if (!this.scriptUrl) throw new Error('Apps Script URL chưa được cấu hình');
+
+        const url = new URL(this.scriptUrl);
+        url.searchParams.set('action', action);
+        for (const [key, value] of Object.entries(params)) {
+            url.searchParams.set(key, value);
+        }
+
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            redirect: 'follow' // Apps Script redirects on deployment
+        });
+
+        if (!response.ok) {
+            throw new Error(`GET failed: ${response.status} ${response.statusText}`);
+        }
+
+        return await response.json();
+    },
+
+    /**
+     * POST request to Apps Script
+     */
+    async _post(body) {
+        if (!this.scriptUrl) throw new Error('Apps Script URL chưa được cấu hình');
+
+        const response = await fetch(this.scriptUrl, {
+            method: 'POST',
+            redirect: 'follow',
+            headers: { 'Content-Type': 'text/plain' }, // Apps Script requires text/plain for CORS
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            throw new Error(`POST failed: ${response.status} ${response.statusText}`);
+        }
+
+        return await response.json();
     }
 };

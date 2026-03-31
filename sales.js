@@ -356,9 +356,11 @@ const Sales = {
                 // Create debt record
                 await Debt.addDebt(saleId, customerName, customerPhone, total, prepaid);
 
-                // Only add transaction for prepaid amount (if any)
+                // Always log a transaction so the sale is visible in Thu Chi
                 if (prepaid > 0) {
-                    await Transactions.addTransaction('income', `Bán nợ (trả trước): ${customerName}`, prepaid, `Đơn: ${saleId}`, now);
+                    await Transactions.addTransaction('income', `Bán nợ (trả trước): ${customerName}`, prepaid, `Đơn: ${saleId} — Tổng nợ: ${Products.formatCurrency(total)}`, now);
+                } else {
+                    await Transactions.addTransaction('income', `Bán nợ (chưa thu): ${customerName}`, 0, `Đơn: ${saleId} — Tổng nợ: ${Products.formatCurrency(total)}`, now);
                 }
 
                 App.showToast(`Bán nợ thành công cho ${customerName}! Tổng: ${Products.formatCurrency(total)}, Trả trước: ${Products.formatCurrency(prepaid)}`, 'success');

@@ -24,20 +24,13 @@ const App = {
             console.warn('IndexedDB not available, will use API-only mode:', error);
         }
 
-        // Initialize Google API
+        // Initialize SheetsAPI (Apps Script mode)
         try {
             await SheetsAPI.init();
-            console.log('Google API initialized');
+            console.log('SheetsAPI initialized (Apps Script mode)');
         } catch (error) {
-            console.error('Failed to initialize Google API:', error);
-            this.showToast('Lỗi khởi tạo Google API', 'error');
+            console.error('Failed to initialize SheetsAPI:', error);
         }
-
-        // Initialize OAuth token client
-        SheetsAPI.initTokenClient(async (response) => {
-            SheetsAPI.startTokenGuard();
-            await this.onSignIn();
-        });
 
         // Setup event listeners
         this.setupEventListeners();
@@ -49,10 +42,9 @@ const App = {
         Reports.init();
         Debt.init();
 
-        // Check for existing valid token and auto-sign in
+        // Auto-connect if Apps Script URL is saved
         if (SheetsAPI.hasValidToken()) {
-            console.log('Found valid saved token, auto-signing in...');
-            SheetsAPI.startTokenGuard();
+            console.log('Found saved Apps Script URL, auto-connecting...');
             await this.onSignIn();
         }
     },
@@ -534,19 +526,28 @@ const App = {
      * Setup event listeners
      */
     setupEventListeners() {
-        // Login button
-        document.getElementById('btn-login').addEventListener('click', () => {
-            SheetsAPI.signIn();
-        });
+        // Connect form (Apps Script URL)
+        document.getElementById('connect-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const scriptUrl = document.getElementById('script-url').value.trim();
+            if (!scriptUrl) {
+                this.showToast('Vui lòng nhập URL Apps Script', 'error');
+                return;
+            }
 
-        // Setup form
-        document.getElementById('setup-form').addEventListener('submit', (e) => {
-            this.handleSetup(e);
-        });
-
-        // Link existing sheet form
-        document.getElementById('link-form').addEventListener('submit', (e) => {
-            this.handleLinkSheet(e);
+            this.showLoading(true);
+            try {
+                const result = await SheetsAPI.linkExistingSheet(scriptUrl);
+                this.showToast('Kết nối thành công!', 'success');
+                document.getElementById('store-name-display').textContent = result.storeName;
+                await this.loadAllData();
+                this.showScreen('app-screen');
+            } catch (error) {
+                console.error('Error connecting:', error);
+                this.showToast(error.message || 'Lỗi kết nối. Kiểm tra lại URL.', 'error');
+            } finally {
+                this.showLoading(false);
+            }
         });
 
         // Logout button
