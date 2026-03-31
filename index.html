@@ -37,7 +37,7 @@
 </head>
 
 <body>
-    <!-- Login / Connect Screen -->
+    <!-- Login Screen -->
     <div id="login-screen" class="screen active">
         <div class="login-container">
             <div class="login-card">
@@ -46,37 +46,33 @@
                 <p class="subtitle">Quản Lý Bán Hàng</p>
 
                 <div class="setup-section">
-                    <h3>🔗 Kết nối Google Sheet</h3>
-                    <p class="note">Nhập URL Apps Script để kết nối với Sheet của bạn.</p>
-                    <form id="connect-form">
+                    <h3 id="auth-title">🔑 Đăng nhập</h3>
+                    <form id="auth-form">
+                        <div class="form-group" id="store-name-group" style="display:none;">
+                            <label for="auth-store">Tên cửa hàng</label>
+                            <input type="text" id="auth-store" placeholder="VD: Cửa hàng ABC">
+                        </div>
                         <div class="form-group">
-                            <label for="script-url">URL Apps Script</label>
-                            <input type="url" id="script-url" placeholder="https://script.google.com/macros/s/.../exec" required>
+                            <label for="auth-email">Email</label>
+                            <input type="email" id="auth-email" placeholder="email@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-password">Mật khẩu</label>
+                            <input type="password" id="auth-password" placeholder="Tối thiểu 6 ký tự" required minlength="6">
                         </div>
                         <button type="submit" id="btn-login" class="btn btn-primary btn-full">
-                            <span>🔗 Kết nối Sheet</span>
+                            <span id="auth-btn-text">🔑 Đăng nhập</span>
                         </button>
                     </form>
+                    <p class="auth-toggle">
+                        <span id="auth-toggle-text">Chưa có tài khoản?</span>
+                        <a href="#" id="auth-toggle-link" onclick="App.toggleAuthMode(); return false;">Đăng ký</a>
+                    </p>
                 </div>
-
-                <details class="setup-help">
-                    <summary>📖 Hướng dẫn lấy URL Apps Script</summary>
-                    <ol>
-                        <li>Mở <a href="https://docs.google.com/spreadsheets" target="_blank">Google Sheets</a> → Tạo Sheet mới hoặc mở Sheet QLBH</li>
-                        <li>Vào <strong>Extensions → Apps Script</strong></li>
-                        <li>Xóa code cũ, dán code từ file <code>gas-script.js</code></li>
-                        <li>Bấm <strong>Deploy → New deployment</strong></li>
-                        <li>Chọn Type: <strong>Web app</strong></li>
-                        <li>Execute as: <strong>Me</strong></li>
-                        <li>Who has access: <strong>Anyone</strong></li>
-                        <li>Bấm <strong>Deploy</strong> → Copy URL</li>
-                        <li>Dán URL vào ô bên trên → Bấm <strong>Kết nối</strong></li>
-                    </ol>
-                    <p class="note">💡 Dữ liệu 100% nằm trên Google Drive của bạn. App chỉ đọc/ghi qua URL này.</p>
-                </details>
             </div>
         </div>
     </div>
+
 
 
     <!-- Main App -->

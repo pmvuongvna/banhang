@@ -331,6 +331,25 @@ body {
     font-size: 0.85rem;
 }
 
+/* Auth toggle (login/register switch) */
+.auth-toggle {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.auth-toggle a {
+    color: var(--accent-primary);
+    font-weight: 600;
+    margin-left: 4px;
+    text-decoration: none;
+}
+
+.auth-toggle a:hover {
+    text-decoration: underline;
+}
+
 .setup-divider {
     display: flex;
     align-items: center;

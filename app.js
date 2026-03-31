@@ -6,6 +6,7 @@
 const App = {
     currentTab: 'dashboard',
     user: null,
+    isRegisterMode: false,
 
     /**
      * Initialize the application
@@ -24,10 +25,12 @@ const App = {
             console.warn('IndexedDB not available, will use API-only mode:', error);
         }
 
-        // Initialize SheetsAPI (Apps Script mode)
+        // Initialize SheetsAPI (Worker mode)
         try {
+            SheetsAPI.workerUrl = CONFIG.WORKER_URL;
+            localStorage.setItem('qlbh_worker_url', CONFIG.WORKER_URL);
             await SheetsAPI.init();
-            console.log('SheetsAPI initialized (Apps Script mode)');
+            console.log('SheetsAPI initialized (Worker mode)');
         } catch (error) {
             console.error('Failed to initialize SheetsAPI:', error);
         }
@@ -42,9 +45,9 @@ const App = {
         Reports.init();
         Debt.init();
 
-        // Auto-connect if Apps Script URL is saved
+        // Auto-login if token is saved
         if (SheetsAPI.hasValidToken()) {
-            console.log('Found saved Apps Script URL, auto-connecting...');
+            console.log('Found saved token, auto-connecting...');
             await this.onSignIn();
         }
     },
@@ -56,30 +59,42 @@ const App = {
         this.showLoading(true);
 
         try {
-            // Get user info
-            this.user = await SheetsAPI.getUserInfo();
-            if (this.user) {
-                document.getElementById('user-avatar').src = this.user.picture || '';
+            // Verify connection to Worker API (with 5s timeout)
+            const checkPromise = SheetsAPI.checkSpreadsheet();
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout')), 5000)
+            );
+
+            let isConnected = false;
+            try {
+                isConnected = await Promise.race([checkPromise, timeoutPromise]);
+            } catch (e) {
+                console.warn('Connection check failed:', e);
             }
 
-            // Check if spreadsheet exists
-            const hasSpreadsheet = await SheetsAPI.checkSpreadsheet();
+            if (isConnected) {
+                // Get user info
+                this.user = await SheetsAPI.getUserInfo();
+                if (this.user) {
+                    document.getElementById('user-avatar').src = this.user.picture || '';
+                }
 
-            if (hasSpreadsheet) {
                 // Load data and show app
-                await this.loadAllData();
-                this.showScreen('app-screen');
-
                 const storeName = await SheetsAPI.getStoreName();
                 document.getElementById('store-name-display').textContent = storeName;
+                await this.loadAllData();
+                this.showScreen('app-screen');
             } else {
-                // Show setup screen
-                this.showScreen('setup-screen');
+                // Connection failed, clear stale data and show login
+                console.warn('Worker connection failed, showing login screen');
+                SheetsAPI.signOut();
+                this.showScreen('login-screen');
             }
 
         } catch (error) {
             console.error('Error during sign in:', error);
-            this.showToast('Lỗi đăng nhập', 'error');
+            this.showToast('Lỗi kết nối server', 'error');
+            this.showScreen('login-screen');
         } finally {
             this.showLoading(false);
         }
@@ -428,6 +443,31 @@ const App = {
     },
 
     /**
+     * Toggle between login and register mode
+     */
+    toggleAuthMode() {
+        this.isRegisterMode = !this.isRegisterMode;
+        const storeGroup = document.getElementById('store-name-group');
+        const title = document.getElementById('auth-title');
+        const btnText = document.getElementById('auth-btn-text');
+        const toggleText = document.getElementById('auth-toggle-text');
+        const toggleLink = document.getElementById('auth-toggle-link');
+
+        if (this.isRegisterMode) {
+            storeGroup.style.display = 'block';
+            title.textContent = '📝 Đăng ký';
+            btnText.textContent = '📝 Đăng ký';
+            toggleText.textContent = 'Đã có tài khoản?';
+            toggleLink.textContent = 'Đăng nhập';
+        } else {
+            storeGroup.style.display = 'none';
+            title.textContent = '🔑 Đăng nhập';
+            btnText.textContent = '🔑 Đăng nhập';
+            toggleText.textContent = 'Chưa có tài khoản?';
+            toggleLink.textContent = 'Đăng ký';
+        }
+    },
+    /**
      * Sign out
      */
     signOut() {
@@ -526,25 +566,32 @@ const App = {
      * Setup event listeners
      */
     setupEventListeners() {
-        // Connect form (Apps Script URL)
-        document.getElementById('connect-form').addEventListener('submit', async (e) => {
+        // Auth form (login/register)
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const scriptUrl = document.getElementById('script-url').value.trim();
-            if (!scriptUrl) {
-                this.showToast('Vui lòng nhập URL Apps Script', 'error');
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value;
+
+            if (!email || !password) {
+                this.showToast('Vui lòng nhập email và mật khẩu', 'error');
                 return;
             }
 
             this.showLoading(true);
             try {
-                const result = await SheetsAPI.linkExistingSheet(scriptUrl);
-                this.showToast('Kết nối thành công!', 'success');
-                document.getElementById('store-name-display').textContent = result.storeName;
-                await this.loadAllData();
-                this.showScreen('app-screen');
+                let result;
+                if (this.isRegisterMode) {
+                    const storeName = document.getElementById('auth-store').value.trim() || 'Cửa hàng';
+                    result = await SheetsAPI.register(email, password, storeName);
+                    this.showToast('Đăng ký thành công!', 'success');
+                } else {
+                    result = await SheetsAPI.login(email, password);
+                    this.showToast('Đăng nhập thành công!', 'success');
+                }
+                await this.onSignIn();
             } catch (error) {
-                console.error('Error connecting:', error);
-                this.showToast(error.message || 'Lỗi kết nối. Kiểm tra lại URL.', 'error');
+                console.error('Auth error:', error);
+                this.showToast(error.message || 'Lỗi đăng nhập', 'error');
             } finally {
                 this.showLoading(false);
             }

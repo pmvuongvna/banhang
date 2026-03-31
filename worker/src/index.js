@@ -357,6 +357,14 @@ api.put('/me', async (c) => {
 // Mount protected API routes
 app.route('/api', api);
 
+// Root / landing
+app.get('/', (c) => c.json({
+    name: 'QLBH API',
+    version: '1.0',
+    status: 'running',
+    endpoints: ['/auth/register', '/auth/login', '/api/*', '/ping']
+}));
+
 // Health check
 app.get('/ping', (c) => c.json({ status: 'ok', time: new Date().toISOString() }));
 

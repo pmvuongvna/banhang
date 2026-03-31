@@ -1,10 +1,12 @@
 /**
  * QLBH - Configuration
- * App Configuration (Apps Script mode - no Google API keys needed)
  */
 
 const CONFIG = {
-    // Sheet names
+    // Worker API URL — set after deployment
+    WORKER_URL: 'https://qlbh-worker.pmvuong-na.workers.dev',
+
+    // Sheet names (kept for compatibility with data mapping)
     SHEETS: {
         PRODUCTS: 'Products',
         SALES: 'Sales',
@@ -24,7 +26,7 @@ const CONFIG = {
     }
 };
 
-// Freeze config to prevent accidental modification
+// Freeze config
 Object.freeze(CONFIG);
 Object.freeze(CONFIG.SHEETS);
 Object.freeze(CONFIG.CATEGORIES);
