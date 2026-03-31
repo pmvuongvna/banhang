@@ -1,0 +1,11 @@
+name = "qlbh-worker"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "qlbh-db"
+database_id = "ebdac018-8e03-4fb1-b711-948a56492aaa"
+# Sau khi tạo D1: wrangler d1 create qlbh-db
+# Copy database_id vào đây
