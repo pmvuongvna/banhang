@@ -2533,6 +2533,8 @@ body {
 }
 
 .modal-overlay .modal {
+    display: flex;
+    flex-direction: column;
     background: var(--bg-primary);
     border-radius: var(--border-radius-lg);
     width: 100%;
