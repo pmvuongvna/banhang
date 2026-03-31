@@ -354,6 +354,105 @@ api.put('/me', async (c) => {
     return c.json({ success: true });
 });
 
+// --- Import from Google Sheet ---
+
+api.post('/import', async (c) => {
+    const userId = c.get('userId');
+    const db = c.env.DB;
+    const { sheetId } = await c.req.json();
+
+    if (!sheetId) {
+        return c.json({ error: 'Sheet ID là bắt buộc' }, 400);
+    }
+
+    const results = { products: 0, sales: 0, transactions: 0, debts: 0, errors: [] };
+
+    try {
+        // 1. Get list of all sheet tabs
+        const sheetNames = await getSheetNames(sheetId);
+        if (!sheetNames || sheetNames.length === 0) {
+            return c.json({ error: 'Không thể đọc Sheet. Hãy chắc chắn Sheet được chia sẻ "Anyone with the link".' }, 400);
+        }
+
+        // 2. Import Products
+        if (sheetNames.includes('Products')) {
+            const rows = await fetchSheetData(sheetId, 'Products');
+            for (const row of rows) {
+                try {
+                    const profit = (parseFloat(row[3]) || 0) - (parseFloat(row[2]) || 0);
+                    await db.prepare(
+                        'INSERT INTO products (user_id, code, name, cost, price, profit, stock, created_at, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                    ).bind(userId, row[0] || '', row[1] || '', parseFloat(row[2]) || 0, parseFloat(row[3]) || 0, profit, parseInt(row[5]) || 0, row[6] || '', row[7] || 'Chung').run();
+                    results.products++;
+                } catch (e) {
+                    results.errors.push(`Product ${row[1]}: ${e.message}`);
+                }
+            }
+        }
+
+        // 3. Import Sales (all Sales_MM_YYYY sheets)
+        const salesSheets = sheetNames.filter(n => n.startsWith('Sales'));
+        for (const name of salesSheets) {
+            const rows = await fetchSheetData(sheetId, name);
+            for (const row of rows) {
+                try {
+                    await db.prepare(
+                        'INSERT INTO sales (user_id, sale_id, datetime, details, total, profit, note) VALUES (?, ?, ?, ?, ?, ?, ?)'
+                    ).bind(userId, row[0] || '', row[1] || '', row[2] || '', parseFloat(row[3]) || 0, parseFloat(row[4]) || 0, row[5] || '').run();
+                    results.sales++;
+                } catch (e) {
+                    results.errors.push(`Sale ${row[0]}: ${e.message}`);
+                }
+            }
+        }
+
+        // 4. Import Transactions (all Transactions_MM_YYYY sheets)
+        const txSheets = sheetNames.filter(n => n.startsWith('Transactions'));
+        for (const name of txSheets) {
+            const rows = await fetchSheetData(sheetId, name);
+            for (const row of rows) {
+                try {
+                    let type = (row[2] || '').toLowerCase();
+                    if (type === 'thu' || type === 'income') type = 'income';
+                    else type = 'expense';
+
+                    await db.prepare(
+                        'INSERT INTO transactions (user_id, tx_id, date, type, description, amount, note) VALUES (?, ?, ?, ?, ?, ?, ?)'
+                    ).bind(userId, row[0] || '', row[1] || '', type, row[3] || '', parseFloat(row[4]) || 0, row[5] || '').run();
+                    results.transactions++;
+                } catch (e) {
+                    results.errors.push(`TX ${row[0]}: ${e.message}`);
+                }
+            }
+        }
+
+        // 5. Import Debts
+        if (sheetNames.includes('Debts')) {
+            const rows = await fetchSheetData(sheetId, 'Debts');
+            for (const row of rows) {
+                try {
+                    await db.prepare(
+                        'INSERT INTO debts (user_id, debt_id, sale_id, customer_name, phone, total, paid, remaining, created_at, updated_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                    ).bind(userId, row[0] || '', row[1] || '', row[2] || '', row[3] || '', parseFloat(row[4]) || 0, parseFloat(row[5]) || 0, parseFloat(row[6]) || 0, row[7] || '', row[8] || '', row[9] || 'Còn nợ').run();
+                    results.debts++;
+                } catch (e) {
+                    results.errors.push(`Debt ${row[0]}: ${e.message}`);
+                }
+            }
+        }
+
+        return c.json({
+            success: true,
+            sheets: sheetNames,
+            imported: results,
+            message: `Import thành công: ${results.products} SP, ${results.sales} đơn, ${results.transactions} thu/chi, ${results.debts} nợ`
+        });
+
+    } catch (error) {
+        return c.json({ error: 'Lỗi import: ' + error.message, details: results }, 500);
+    }
+});
+
 // Mount protected API routes
 app.route('/api', api);
 
@@ -367,5 +466,108 @@ app.get('/', (c) => c.json({
 
 // Health check
 app.get('/ping', (c) => c.json({ status: 'ok', time: new Date().toISOString() }));
+
+// ==========================================
+// Helper: Fetch Google Sheet data (public)
+// ==========================================
+
+/**
+ * Get all sheet tab names from a public Google Sheet
+ */
+async function getSheetNames(sheetId) {
+    try {
+        // Use the gviz endpoint to get sheet metadata
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=Products&tq=SELECT%20*%20LIMIT%200`;
+        const response = await fetch(url, { redirect: 'follow' });
+        const text = await response.text();
+
+        // Alternative: try to parse the HTML of the spreadsheet
+        const htmlUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+        const htmlResponse = await fetch(htmlUrl, { redirect: 'follow' });
+        const html = await htmlResponse.text();
+
+        // Extract sheet names from the HTML
+        const sheetNames = [];
+        const regex = /\\"name\\":\\"([^"\\]+)\\"/g;
+        let match;
+        while ((match = regex.exec(html)) !== null) {
+            if (!sheetNames.includes(match[1])) {
+                sheetNames.push(match[1]);
+            }
+        }
+
+        // Fallback: try common sheet names
+        if (sheetNames.length === 0) {
+            const commonNames = ['Products', 'Debts', 'Settings'];
+            // Add likely month sheets for current and recent months
+            const now = new Date();
+            for (let i = 0; i < 6; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                commonNames.push(`Sales_${mm}_${yyyy}`);
+                commonNames.push(`Transactions_${mm}_${yyyy}`);
+            }
+
+            for (const name of commonNames) {
+                try {
+                    const testUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}&tq=SELECT%20*%20LIMIT%201`;
+                    const testRes = await fetch(testUrl, { redirect: 'follow' });
+                    const testText = await testRes.text();
+                    if (testRes.ok && !testText.includes('Invalid')) {
+                        sheetNames.push(name);
+                    }
+                } catch (_) {}
+            }
+        }
+
+        return sheetNames;
+    } catch (e) {
+        console.error('getSheetNames error:', e);
+        return [];
+    }
+}
+
+/**
+ * Fetch data rows from a specific sheet tab
+ */
+async function fetchSheetData(sheetId, sheetName) {
+    try {
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+        const response = await fetch(url, { redirect: 'follow' });
+        const text = await response.text();
+
+        // Response is JSONP: google.visualization.Query.setResponse({...})
+        const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\((.+)\);?\s*$/);
+        if (!jsonMatch) {
+            console.error('Failed to parse gviz response for', sheetName);
+            return [];
+        }
+
+        const data = JSON.parse(jsonMatch[1]);
+        const table = data.table;
+        if (!table || !table.rows) return [];
+
+        // Skip header row (first row is headers in gviz)
+        const rows = [];
+        for (const row of table.rows) {
+            const cells = row.c.map(cell => {
+                if (!cell) return '';
+                if (cell.f) return cell.f; // formatted value
+                if (cell.v !== null && cell.v !== undefined) return String(cell.v);
+                return '';
+            });
+            // Skip empty rows
+            if (cells.some(c => c !== '')) {
+                rows.push(cells);
+            }
+        }
+
+        return rows;
+    } catch (e) {
+        console.error('fetchSheetData error:', sheetName, e);
+        return [];
+    }
+}
 
 export default app;
