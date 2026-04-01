@@ -465,15 +465,18 @@ api.post('/import', async (c) => {
             }
         }
 
-        // 3. Import Sales (all Sales_MM_YYYY sheets)
+        // 3. Import Sales (all Sales and Sales_MM_YYYY sheets)
         const salesSheets = sheetNames.filter(n => n.startsWith('Sales'));
         for (const name of salesSheets) {
             const rows = await fetchSheetData(sheetId, name);
             for (const row of rows) {
                 try {
+                    // Sheet cols: Mã đơn[0], Ngày giờ[1], Chi tiết[2], Tổng tiền[3], Khách hàng[4], SĐT[5], Ghi chú[6]
+                    const customer = [row[4], row[5]].filter(Boolean).join(' - ');
+                    const note = [row[6], customer].filter(Boolean).join(' | ');
                     await db.prepare(
                         'INSERT INTO sales (user_id, sale_id, datetime, details, total, profit, note) VALUES (?, ?, ?, ?, ?, ?, ?)'
-                    ).bind(userId, row[0] || '', row[1] || '', row[2] || '', parseFloat(row[3]) || 0, parseFloat(row[4]) || 0, row[5] || '').run();
+                    ).bind(userId, row[0] || '', row[1] || '', row[2] || '', parseFloat(row[3]) || 0, 0, note).run();
                     results.sales++;
                 } catch (e) {
                     results.errors.push(`Sale ${row[0]}: ${e.message}`);
@@ -547,60 +550,40 @@ app.get('/ping', (c) => c.json({ status: 'ok', time: new Date().toISOString() })
 // ==========================================
 
 /**
- * Get all sheet tab names from a public Google Sheet
+ * Get all sheet tab names from a public Google Sheet by probing known names
  */
 async function getSheetNames(sheetId) {
-    try {
-        // Use the gviz endpoint to get sheet metadata
-        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=Products&tq=SELECT%20*%20LIMIT%200`;
-        const response = await fetch(url, { redirect: 'follow' });
-        const text = await response.text();
+    const sheetNames = [];
 
-        // Alternative: try to parse the HTML of the spreadsheet
-        const htmlUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
-        const htmlResponse = await fetch(htmlUrl, { redirect: 'follow' });
-        const html = await htmlResponse.text();
+    // All possible QLBH sheet names to probe
+    const candidates = ['Products', 'Sales', 'Debts', 'Settings'];
 
-        // Extract sheet names from the HTML
-        const sheetNames = [];
-        const regex = /\\"name\\":\\"([^"\\]+)\\"/g;
-        let match;
-        while ((match = regex.exec(html)) !== null) {
-            if (!sheetNames.includes(match[1])) {
-                sheetNames.push(match[1]);
-            }
-        }
-
-        // Fallback: try common sheet names
-        if (sheetNames.length === 0) {
-            const commonNames = ['Products', 'Debts', 'Settings'];
-            // Add likely month sheets for current and recent months
-            const now = new Date();
-            for (let i = 0; i < 6; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const yyyy = d.getFullYear();
-                commonNames.push(`Sales_${mm}_${yyyy}`);
-                commonNames.push(`Transactions_${mm}_${yyyy}`);
-            }
-
-            for (const name of commonNames) {
-                try {
-                    const testUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}&tq=SELECT%20*%20LIMIT%201`;
-                    const testRes = await fetch(testUrl, { redirect: 'follow' });
-                    const testText = await testRes.text();
-                    if (testRes.ok && !testText.includes('Invalid')) {
-                        sheetNames.push(name);
-                    }
-                } catch (_) {}
-            }
-        }
-
-        return sheetNames;
-    } catch (e) {
-        console.error('getSheetNames error:', e);
-        return [];
+    // Add month-based sheets for the past 12 months
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        candidates.push(`Sales_${mm}_${yyyy}`);
+        candidates.push(`Transactions_${mm}_${yyyy}`);
     }
+    candidates.push('Transactions'); // base Transactions sheet
+
+    // Probe each candidate
+    for (const name of candidates) {
+        try {
+            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}&tq=${encodeURIComponent('SELECT * LIMIT 1')}`;
+            const res = await fetch(url, { redirect: 'follow' });
+            const text = await res.text();
+
+            // Check if response contains valid gviz data (not an error)
+            if (text.includes('google.visualization.Query.setResponse') && !text.includes('"status":"error"')) {
+                sheetNames.push(name);
+            }
+        } catch (_) {}
+    }
+
+    return sheetNames;
 }
 
 /**
