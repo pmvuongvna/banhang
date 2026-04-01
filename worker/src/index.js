@@ -435,15 +435,39 @@ api.put('/me', async (c) => {
     return c.json({ success: true });
 });
 
+// --- Reset user data ---
+
+api.delete('/reset', async (c) => {
+    const userId = c.get('userId');
+    const db = c.env.DB;
+    await db.batch([
+        db.prepare('DELETE FROM products WHERE user_id = ?').bind(userId),
+        db.prepare('DELETE FROM sales WHERE user_id = ?').bind(userId),
+        db.prepare('DELETE FROM transactions WHERE user_id = ?').bind(userId),
+        db.prepare('DELETE FROM debts WHERE user_id = ?').bind(userId),
+    ]);
+    return c.json({ success: true, message: 'Đã xóa toàn bộ dữ liệu' });
+});
+
 // --- Import from Google Sheet ---
 
 api.post('/import', async (c) => {
     const userId = c.get('userId');
     const db = c.env.DB;
-    const { sheetId } = await c.req.json();
+    const { sheetId, clearFirst } = await c.req.json();
 
     if (!sheetId) {
         return c.json({ error: 'Sheet ID là bắt buộc' }, 400);
+    }
+
+    // Clear existing data before import to prevent duplicates
+    if (clearFirst !== false) {
+        await db.batch([
+            db.prepare('DELETE FROM products WHERE user_id = ?').bind(userId),
+            db.prepare('DELETE FROM sales WHERE user_id = ?').bind(userId),
+            db.prepare('DELETE FROM transactions WHERE user_id = ?').bind(userId),
+            db.prepare('DELETE FROM debts WHERE user_id = ?').bind(userId),
+        ]);
     }
 
     const results = { products: 0, sales: 0, transactions: 0, debts: 0, errors: [] };
