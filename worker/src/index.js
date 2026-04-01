@@ -220,11 +220,14 @@ api.get('/sales', async (c) => {
     const params = [userId];
 
     if (month && year) {
-        // Filter by month pattern in datetime (dd/mm/yyyy or yyyy-mm-dd, etc.)
+        // Handle multiple date formats: "1/3/2026", "01/03/2026", "2026-03-01", etc.
         const monthPadded = month.padStart(2, '0');
-        query += ` AND (datetime LIKE ? OR datetime LIKE ?)`;
-        params.push(`%/${monthPadded}/${year}%`); // dd/mm/yyyy format
-        params.push(`${year}-${monthPadded}-%`);  // ISO format
+        const monthNum = parseInt(month).toString(); // remove leading zero
+        query += ` AND (datetime LIKE ? OR datetime LIKE ? OR datetime LIKE ? OR datetime LIKE ?)`;
+        params.push(`%/${monthPadded}/${year}%`);  // dd/mm/yyyy padded
+        params.push(`%/${monthNum}/${year}%`);      // d/m/yyyy non-padded
+        params.push(`${year}-${monthPadded}-%`);    // ISO format
+        params.push(`% ${monthNum}/${year}%`);      // "time d/m/yyyy" format
     }
 
     query += ' ORDER BY id DESC';
@@ -273,9 +276,12 @@ api.get('/transactions', async (c) => {
 
     if (month && year) {
         const monthPadded = month.padStart(2, '0');
-        query += ` AND (date LIKE ? OR date LIKE ?)`;
+        const monthNum = parseInt(month).toString();
+        query += ` AND (date LIKE ? OR date LIKE ? OR date LIKE ? OR date LIKE ?)`;
         params.push(`%/${monthPadded}/${year}%`);
+        params.push(`%/${monthNum}/${year}%`);
         params.push(`${year}-${monthPadded}-%`);
+        params.push(`% ${monthNum}/${year}%`);
     }
 
     query += ' ORDER BY id DESC';
